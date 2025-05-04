@@ -1,0 +1,1 @@
+/usr/bin/g++ -g CMakeFiles/provider.dir/userservice.cc.o CMakeFiles/provider.dir/login_service.cc.o CMakeFiles/provider.dir/__/test.pb.cc.o -o /home/ermis/vs_project/GcRPC/bin/provider   -L/home/ermis/vs_project/GcRPC/lib  -Wl,-rpath,/home/ermis/vs_project/GcRPC/lib /home/ermis/vs_project/GcRPC/lib/libgcrpc.so -lprotobuf 

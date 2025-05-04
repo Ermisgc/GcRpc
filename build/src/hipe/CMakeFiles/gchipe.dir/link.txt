@@ -1,0 +1,1 @@
+/usr/bin/g++ -fPIC -g -shared -Wl,-soname,libgchipe.so -o /home/ermis/vs_project/GcRPC/lib/libgchipe.so CMakeFiles/gchipe.dir/dynamic_threadpool.cc.o   -L/home/ermis/vs_project/GcRPC/lib 
