@@ -130,6 +130,30 @@ gcrpc/fast:
 	cd /home/ermis/vs_project/GcRPC/build && $(MAKE) $(MAKESILENT) -f src/Rpc/CMakeFiles/gcrpc.dir/build.make src/Rpc/CMakeFiles/gcrpc.dir/build
 .PHONY : gcrpc/fast
 
+buffer.o: buffer.cc.o
+.PHONY : buffer.o
+
+# target to build an object file
+buffer.cc.o:
+	cd /home/ermis/vs_project/GcRPC/build && $(MAKE) $(MAKESILENT) -f src/Rpc/CMakeFiles/gcrpc.dir/build.make src/Rpc/CMakeFiles/gcrpc.dir/buffer.cc.o
+.PHONY : buffer.cc.o
+
+buffer.i: buffer.cc.i
+.PHONY : buffer.i
+
+# target to preprocess a source file
+buffer.cc.i:
+	cd /home/ermis/vs_project/GcRPC/build && $(MAKE) $(MAKESILENT) -f src/Rpc/CMakeFiles/gcrpc.dir/build.make src/Rpc/CMakeFiles/gcrpc.dir/buffer.cc.i
+.PHONY : buffer.cc.i
+
+buffer.s: buffer.cc.s
+.PHONY : buffer.s
+
+# target to generate assembly for a file
+buffer.cc.s:
+	cd /home/ermis/vs_project/GcRPC/build && $(MAKE) $(MAKESILENT) -f src/Rpc/CMakeFiles/gcrpc.dir/build.make src/Rpc/CMakeFiles/gcrpc.dir/buffer.cc.s
+.PHONY : buffer.cc.s
+
 channel.o: channel.cc.o
 .PHONY : channel.o
 
@@ -250,6 +274,78 @@ gcrpcconfig.cc.s:
 	cd /home/ermis/vs_project/GcRPC/build && $(MAKE) $(MAKESILENT) -f src/Rpc/CMakeFiles/gcrpc.dir/build.make src/Rpc/CMakeFiles/gcrpc.dir/gcrpcconfig.cc.s
 .PHONY : gcrpcconfig.cc.s
 
+generic_rpc.pb.o: generic_rpc.pb.cc.o
+.PHONY : generic_rpc.pb.o
+
+# target to build an object file
+generic_rpc.pb.cc.o:
+	cd /home/ermis/vs_project/GcRPC/build && $(MAKE) $(MAKESILENT) -f src/Rpc/CMakeFiles/gcrpc.dir/build.make src/Rpc/CMakeFiles/gcrpc.dir/generic_rpc.pb.cc.o
+.PHONY : generic_rpc.pb.cc.o
+
+generic_rpc.pb.i: generic_rpc.pb.cc.i
+.PHONY : generic_rpc.pb.i
+
+# target to preprocess a source file
+generic_rpc.pb.cc.i:
+	cd /home/ermis/vs_project/GcRPC/build && $(MAKE) $(MAKESILENT) -f src/Rpc/CMakeFiles/gcrpc.dir/build.make src/Rpc/CMakeFiles/gcrpc.dir/generic_rpc.pb.cc.i
+.PHONY : generic_rpc.pb.cc.i
+
+generic_rpc.pb.s: generic_rpc.pb.cc.s
+.PHONY : generic_rpc.pb.s
+
+# target to generate assembly for a file
+generic_rpc.pb.cc.s:
+	cd /home/ermis/vs_project/GcRPC/build && $(MAKE) $(MAKESILENT) -f src/Rpc/CMakeFiles/gcrpc.dir/build.make src/Rpc/CMakeFiles/gcrpc.dir/generic_rpc.pb.cc.s
+.PHONY : generic_rpc.pb.cc.s
+
+net_base.o: net_base.cc.o
+.PHONY : net_base.o
+
+# target to build an object file
+net_base.cc.o:
+	cd /home/ermis/vs_project/GcRPC/build && $(MAKE) $(MAKESILENT) -f src/Rpc/CMakeFiles/gcrpc.dir/build.make src/Rpc/CMakeFiles/gcrpc.dir/net_base.cc.o
+.PHONY : net_base.cc.o
+
+net_base.i: net_base.cc.i
+.PHONY : net_base.i
+
+# target to preprocess a source file
+net_base.cc.i:
+	cd /home/ermis/vs_project/GcRPC/build && $(MAKE) $(MAKESILENT) -f src/Rpc/CMakeFiles/gcrpc.dir/build.make src/Rpc/CMakeFiles/gcrpc.dir/net_base.cc.i
+.PHONY : net_base.cc.i
+
+net_base.s: net_base.cc.s
+.PHONY : net_base.s
+
+# target to generate assembly for a file
+net_base.cc.s:
+	cd /home/ermis/vs_project/GcRPC/build && $(MAKE) $(MAKESILENT) -f src/Rpc/CMakeFiles/gcrpc.dir/build.make src/Rpc/CMakeFiles/gcrpc.dir/net_base.cc.s
+.PHONY : net_base.cc.s
+
+poller.o: poller.cc.o
+.PHONY : poller.o
+
+# target to build an object file
+poller.cc.o:
+	cd /home/ermis/vs_project/GcRPC/build && $(MAKE) $(MAKESILENT) -f src/Rpc/CMakeFiles/gcrpc.dir/build.make src/Rpc/CMakeFiles/gcrpc.dir/poller.cc.o
+.PHONY : poller.cc.o
+
+poller.i: poller.cc.i
+.PHONY : poller.i
+
+# target to preprocess a source file
+poller.cc.i:
+	cd /home/ermis/vs_project/GcRPC/build && $(MAKE) $(MAKESILENT) -f src/Rpc/CMakeFiles/gcrpc.dir/build.make src/Rpc/CMakeFiles/gcrpc.dir/poller.cc.i
+.PHONY : poller.cc.i
+
+poller.s: poller.cc.s
+.PHONY : poller.s
+
+# target to generate assembly for a file
+poller.cc.s:
+	cd /home/ermis/vs_project/GcRPC/build && $(MAKE) $(MAKESILENT) -f src/Rpc/CMakeFiles/gcrpc.dir/build.make src/Rpc/CMakeFiles/gcrpc.dir/poller.cc.s
+.PHONY : poller.cc.s
+
 rpcprovider.o: rpcprovider.cc.o
 .PHONY : rpcprovider.o
 
@@ -283,6 +379,9 @@ help:
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
 	@echo "... gcrpc"
+	@echo "... buffer.o"
+	@echo "... buffer.i"
+	@echo "... buffer.s"
 	@echo "... channel.o"
 	@echo "... channel.i"
 	@echo "... channel.s"
@@ -298,6 +397,15 @@ help:
 	@echo "... gcrpcconfig.o"
 	@echo "... gcrpcconfig.i"
 	@echo "... gcrpcconfig.s"
+	@echo "... generic_rpc.pb.o"
+	@echo "... generic_rpc.pb.i"
+	@echo "... generic_rpc.pb.s"
+	@echo "... net_base.o"
+	@echo "... net_base.i"
+	@echo "... net_base.s"
+	@echo "... poller.o"
+	@echo "... poller.i"
+	@echo "... poller.s"
 	@echo "... rpcprovider.o"
 	@echo "... rpcprovider.i"
 	@echo "... rpcprovider.s"

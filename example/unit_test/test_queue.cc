@@ -1,60 +1,137 @@
 #include "data_structure/lockfreequeue.h"
+#include "data_structure/concurrentqueue.h"
 #include <thread>
 #include <iostream>
 #include <mutex>
 #include <chrono>
+#include <cassert>
 using namespace std;
 
-atomic<int> sum;
+void singleThreadTest() {
+    LockFreeQueue<int> queue;
+    int val = 0;
+    assert(!queue.dequeue(&val)); // 队列为空
+    queue.enqueue(1);
+    queue.dequeue(&val);
+    assert(val == 1); // 正确出队
+    queue.enqueue(2);
+    queue.enqueue(3);
+    queue.dequeue(&val);
+    assert(val == 2);
+    queue.dequeue(&val);
+    assert(val == 3);
+    assert(!queue.dequeue(&val)); // 队列再次为空
 
-void add(){
-    for(int i = 0;i < 50000000; ++i){
-        sum++;
-    }
+    cout << "[+] SingleThreadTest Pass" << endl;
 }
 
-int sum2 = 0;
-std::mutex mtx;
-void add2(){
-    for(int i = 0;i < 50000000; ++i){
-        unique_lock<mutex> locker(mtx);
-        sum2++;
+void multiThreadTest(int test_id) {
+    LockFreeQueue<int> queue;
+    std::atomic<int> sum(0);
+    constexpr int numProducers = 4;
+    constexpr int numConsumers = 4;
+    constexpr int itemsPerProducer = 10000;
+
+    // 生产者线程
+    auto producer = [&](int start) {
+        for (int i = 0; i < itemsPerProducer; ++i) {
+            queue.enqueue(start + i + 1); //规避掉0这个变量
+        }
+    };
+
+    // 消费者线程
+    auto consumer = [&] {
+            for (int i = 0; i < itemsPerProducer * numProducers / numConsumers; ++i) {
+                int val = 0;
+                while (!queue.dequeue(&val)) {} // 忙等直到取出元素
+                sum += val;
+            }
+        };
+
+    std::vector<std::thread> producers, consumers;
+    for (int i = 0; i < numProducers; ++i) {
+        producers.emplace_back(producer, 0);
     }
+    
+    for (int i = 0; i < numConsumers; ++i) {
+        consumers.emplace_back(consumer);
+    }
+
+    for (auto& t : producers) t.join();
+    for (auto& t : consumers) t.join();
+
+    int expected = numProducers * (itemsPerProducer + 1) * itemsPerProducer / 2;
+    //std::cout << "expected sum: " << expected << std::endl;
+    //std::cout << "actual sum: " << sum.load() << std::endl;
+    assert(sum == expected);
+    std::cout << "[+] MultiThreadTest Pass:" << test_id << endl;
 }
 
+void singleThreadTestForConcurrentqueue() {
+    moodycamel::ConcurrentQueue<int> queue;
+    int val = 0;
+    assert(!queue.try_dequeue(val)); // 队列为空
+    queue.enqueue(1);
+    queue.try_dequeue(val);
+    assert(val == 1); // 正确出队
+    queue.enqueue(2);
+    queue.enqueue(3);
+    queue.try_dequeue(val);
+    assert(val == 2);
+    queue.try_dequeue(val);
+    assert(val == 3);
+    assert(!queue.try_dequeue(val)); // 队列再次为空
 
-int main(){
-    LockFreeQueue<int> q(512);
-    auto start = std::chrono::system_clock::now();
-    for(int i = 0;i < 10; ++i){
-        sum.store(0);
-        thread t1 = thread(add);
-        thread t2 = thread(add);
-        t1.join();
-        t2.join();
-        if(sum != 100000000){
-            cout << "atomic 结果不对" << endl;
-        }
-    }
-    auto end = std::chrono::system_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    std::cout << "花费了" << double(duration.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den << "秒" << std::endl;
-    
+    cout << "[+] SingleThreadTest Pass" << endl;
+}
 
-    start = std::chrono::system_clock::now();
-    for(int i = 0;i < 10; ++i){
-        sum2 = 0;
-        thread t1 = thread(add2);
-        thread t2 = thread(add2);
-        t1.join();
-        t2.join();
-        if(sum != 100000000){
-            cout << "mutex 结果不对" << endl;
+void multiThreadTestForConcurrentqueue(int test_id) {
+    moodycamel::ConcurrentQueue<int> queue;
+    std::atomic<int> sum(0);
+    constexpr int numProducers = 4;
+    constexpr int numConsumers = 4;
+    constexpr int itemsPerProducer = 10000;
+
+    // 生产者线程
+    auto producer = [&](int start) {
+        for (int i = 0; i < itemsPerProducer; ++i) {
+            queue.enqueue(start + i + 1); //规避掉0这个变量
         }
+        };
+
+    // 消费者线程
+    auto consumer = [&] {
+        for (int i = 0; i < itemsPerProducer * numProducers / numConsumers; ++i) {
+            int val = 0;
+            while (!queue.try_dequeue(val)) {} // 忙等直到取出元素
+            sum += val;
+        }
+        };
+
+    std::vector<std::thread> producers, consumers;
+    for (int i = 0; i < numProducers; ++i) {
+        producers.emplace_back(producer, 0);
     }
-    end = std::chrono::system_clock::now();
-    duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    std::cout << "花费了" << double(duration.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den << "秒" << std::endl;
-    
+
+    for (int i = 0; i < numConsumers; ++i) {
+        consumers.emplace_back(consumer);
+    }
+
+    for (auto& t : producers) t.join();
+    for (auto& t : consumers) t.join();
+
+    int expected = numProducers * (itemsPerProducer + 1) * itemsPerProducer / 2;
+    //std::cout << "expected sum: " << expected << std::endl;
+    //std::cout << "actual sum: " << sum.load() << std::endl;
+    assert(sum == expected);
+    std::cout << "[+] ConcurrentQueue MultiThreadTest Pass:" << test_id << endl;
+}
+
+int main() {
+    singleThreadTestForConcurrentqueue();
+    singleThreadTest();
+    for (int i = 0; i < 200; ++i) {
+        multiThreadTestForConcurrentqueue(i + 1);
+    }
     return 0;
 }

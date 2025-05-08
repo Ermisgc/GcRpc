@@ -144,6 +144,20 @@ test_queue/fast:
 	cd /home/ermis/vs_project/GcRPC/build && $(MAKE) $(MAKESILENT) -f example/unit_test/CMakeFiles/test_queue.dir/build.make example/unit_test/CMakeFiles/test_queue.dir/build
 .PHONY : test_queue/fast
 
+# Convenience name for target.
+example/unit_test/CMakeFiles/myuring.dir/rule:
+	cd /home/ermis/vs_project/GcRPC/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 example/unit_test/CMakeFiles/myuring.dir/rule
+.PHONY : example/unit_test/CMakeFiles/myuring.dir/rule
+
+# Convenience name for target.
+myuring: example/unit_test/CMakeFiles/myuring.dir/rule
+.PHONY : myuring
+
+# fast build rule for target.
+myuring/fast:
+	cd /home/ermis/vs_project/GcRPC/build && $(MAKE) $(MAKESILENT) -f example/unit_test/CMakeFiles/myuring.dir/build.make example/unit_test/CMakeFiles/myuring.dir/build
+.PHONY : myuring/fast
+
 test_logger.o: test_logger.cc.o
 .PHONY : test_logger.o
 
@@ -192,6 +206,30 @@ test_queue.cc.s:
 	cd /home/ermis/vs_project/GcRPC/build && $(MAKE) $(MAKESILENT) -f example/unit_test/CMakeFiles/test_queue.dir/build.make example/unit_test/CMakeFiles/test_queue.dir/test_queue.cc.s
 .PHONY : test_queue.cc.s
 
+test_uring.o: test_uring.cc.o
+.PHONY : test_uring.o
+
+# target to build an object file
+test_uring.cc.o:
+	cd /home/ermis/vs_project/GcRPC/build && $(MAKE) $(MAKESILENT) -f example/unit_test/CMakeFiles/myuring.dir/build.make example/unit_test/CMakeFiles/myuring.dir/test_uring.cc.o
+.PHONY : test_uring.cc.o
+
+test_uring.i: test_uring.cc.i
+.PHONY : test_uring.i
+
+# target to preprocess a source file
+test_uring.cc.i:
+	cd /home/ermis/vs_project/GcRPC/build && $(MAKE) $(MAKESILENT) -f example/unit_test/CMakeFiles/myuring.dir/build.make example/unit_test/CMakeFiles/myuring.dir/test_uring.cc.i
+.PHONY : test_uring.cc.i
+
+test_uring.s: test_uring.cc.s
+.PHONY : test_uring.s
+
+# target to generate assembly for a file
+test_uring.cc.s:
+	cd /home/ermis/vs_project/GcRPC/build && $(MAKE) $(MAKESILENT) -f example/unit_test/CMakeFiles/myuring.dir/build.make example/unit_test/CMakeFiles/myuring.dir/test_uring.cc.s
+.PHONY : test_uring.cc.s
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -200,6 +238,7 @@ help:
 	@echo "... depend"
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
+	@echo "... myuring"
 	@echo "... test_logger"
 	@echo "... test_queue"
 	@echo "... test_logger.o"
@@ -208,6 +247,9 @@ help:
 	@echo "... test_queue.o"
 	@echo "... test_queue.i"
 	@echo "... test_queue.s"
+	@echo "... test_uring.o"
+	@echo "... test_uring.i"
+	@echo "... test_uring.s"
 .PHONY : help
 
 

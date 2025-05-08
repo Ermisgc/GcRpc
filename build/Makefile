@@ -194,6 +194,19 @@ test_queue/fast:
 	$(MAKE) $(MAKESILENT) -f example/unit_test/CMakeFiles/test_queue.dir/build.make example/unit_test/CMakeFiles/test_queue.dir/build
 .PHONY : test_queue/fast
 
+#=============================================================================
+# Target rules for targets named myuring
+
+# Build rule for target.
+myuring: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 myuring
+.PHONY : myuring
+
+# fast build rule for target.
+myuring/fast:
+	$(MAKE) $(MAKESILENT) -f example/unit_test/CMakeFiles/myuring.dir/build.make example/unit_test/CMakeFiles/myuring.dir/build
+.PHONY : myuring/fast
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -205,6 +218,7 @@ help:
 	@echo "... gchipe"
 	@echo "... gcrpc"
 	@echo "... gcspdlog"
+	@echo "... myuring"
 	@echo "... provider"
 	@echo "... test_logger"
 	@echo "... test_queue"

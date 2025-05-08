@@ -1,0 +1,1 @@
+/usr/bin/g++ -g CMakeFiles/myuring.dir/test_uring.cc.o -o /home/ermis/vs_project/GcRPC/bin/myuring   -L/home/ermis/vs_project/GcRPC/lib  -Wl,-rpath,/home/ermis/vs_project/GcRPC/lib -luring 

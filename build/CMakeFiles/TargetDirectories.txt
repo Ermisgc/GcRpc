@@ -18,5 +18,6 @@
 /home/ermis/vs_project/GcRPC/build/example/callee/CMakeFiles/rebuild_cache.dir
 /home/ermis/vs_project/GcRPC/build/example/unit_test/CMakeFiles/test_logger.dir
 /home/ermis/vs_project/GcRPC/build/example/unit_test/CMakeFiles/test_queue.dir
+/home/ermis/vs_project/GcRPC/build/example/unit_test/CMakeFiles/myuring.dir
 /home/ermis/vs_project/GcRPC/build/example/unit_test/CMakeFiles/edit_cache.dir
 /home/ermis/vs_project/GcRPC/build/example/unit_test/CMakeFiles/rebuild_cache.dir

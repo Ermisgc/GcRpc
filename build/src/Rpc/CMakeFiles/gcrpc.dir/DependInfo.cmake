@@ -8,11 +8,15 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
+  "/home/ermis/vs_project/GcRPC/src/Rpc/buffer.cc" "src/Rpc/CMakeFiles/gcrpc.dir/buffer.cc.o" "gcc" "src/Rpc/CMakeFiles/gcrpc.dir/buffer.cc.o.d"
   "/home/ermis/vs_project/GcRPC/src/Rpc/channel.cc" "src/Rpc/CMakeFiles/gcrpc.dir/channel.cc.o" "gcc" "src/Rpc/CMakeFiles/gcrpc.dir/channel.cc.o.d"
   "/home/ermis/vs_project/GcRPC/src/Rpc/epoller.cc" "src/Rpc/CMakeFiles/gcrpc.dir/epoller.cc.o" "gcc" "src/Rpc/CMakeFiles/gcrpc.dir/epoller.cc.o.d"
   "/home/ermis/vs_project/GcRPC/src/Rpc/event_loop.cc" "src/Rpc/CMakeFiles/gcrpc.dir/event_loop.cc.o" "gcc" "src/Rpc/CMakeFiles/gcrpc.dir/event_loop.cc.o.d"
   "/home/ermis/vs_project/GcRPC/src/Rpc/gcrpcapplication.cc" "src/Rpc/CMakeFiles/gcrpc.dir/gcrpcapplication.cc.o" "gcc" "src/Rpc/CMakeFiles/gcrpc.dir/gcrpcapplication.cc.o.d"
   "/home/ermis/vs_project/GcRPC/src/Rpc/gcrpcconfig.cc" "src/Rpc/CMakeFiles/gcrpc.dir/gcrpcconfig.cc.o" "gcc" "src/Rpc/CMakeFiles/gcrpc.dir/gcrpcconfig.cc.o.d"
+  "/home/ermis/vs_project/GcRPC/src/Rpc/generic_rpc.pb.cc" "src/Rpc/CMakeFiles/gcrpc.dir/generic_rpc.pb.cc.o" "gcc" "src/Rpc/CMakeFiles/gcrpc.dir/generic_rpc.pb.cc.o.d"
+  "/home/ermis/vs_project/GcRPC/src/Rpc/net_base.cc" "src/Rpc/CMakeFiles/gcrpc.dir/net_base.cc.o" "gcc" "src/Rpc/CMakeFiles/gcrpc.dir/net_base.cc.o.d"
+  "/home/ermis/vs_project/GcRPC/src/Rpc/poller.cc" "src/Rpc/CMakeFiles/gcrpc.dir/poller.cc.o" "gcc" "src/Rpc/CMakeFiles/gcrpc.dir/poller.cc.o.d"
   "/home/ermis/vs_project/GcRPC/src/Rpc/rpcprovider.cc" "src/Rpc/CMakeFiles/gcrpc.dir/rpcprovider.cc.o" "gcc" "src/Rpc/CMakeFiles/gcrpc.dir/rpcprovider.cc.o.d"
   )
 

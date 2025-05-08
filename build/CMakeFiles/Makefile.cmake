@@ -64,4 +64,5 @@ set(CMAKE_DEPEND_INFO_FILES
   "example/callee/CMakeFiles/provider.dir/DependInfo.cmake"
   "example/unit_test/CMakeFiles/test_logger.dir/DependInfo.cmake"
   "example/unit_test/CMakeFiles/test_queue.dir/DependInfo.cmake"
+  "example/unit_test/CMakeFiles/myuring.dir/DependInfo.cmake"
   )
