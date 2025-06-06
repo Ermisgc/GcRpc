@@ -18,5 +18,9 @@ namespace GcRpc{
     public:
         static GcRpcApplication& getInstance();
         void Init(int argc, char** argv);
+        
+        static inline const std::string Load(const std::string & key){
+            return std::move(m_config.Load(key));
+        }
     };
 ;}

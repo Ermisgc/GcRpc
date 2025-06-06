@@ -1,1 +1,0 @@
-/usr/bin/g++ -g CMakeFiles/test_queue.dir/test_queue.cc.o -o /home/ermis/vs_project/GcRPC/bin/test_queue   -L/home/ermis/vs_project/GcRPC/lib  -Wl,-rpath,/home/ermis/vs_project/GcRPC/lib /home/ermis/vs_project/GcRPC/lib/libgcrpc.so 

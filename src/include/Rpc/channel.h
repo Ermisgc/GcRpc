@@ -6,6 +6,7 @@
 
 #pragma once
 #include "buffer.h"
+#include "arpa/inet.h"
 #include <functional>
 #define USER_EVENT_ACCEPT 0
 #define USER_EVENT_READ 1
@@ -15,13 +16,11 @@
 
 namespace GcRpc{
     class Buffer;
-    class EventLoop;
-    class BufferPool;
-    class RpcChannel{
-        using EventHandler = std::function<void(RpcChannel *)>;
+    class Channel{
+        using EventHandler = std::function<void(void*)>;
     public:
-        RpcChannel(int fd, EventHandler && callback);
-        ~RpcChannel();
+        Channel(int fd);
+        ~Channel();
 
         inline void setFileDescriptor(int fd){
             _fd = fd;
@@ -55,14 +54,35 @@ namespace GcRpc{
             return std::move(_buf->retrieveAllBufferAsString());
         }
 
-        inline void handle(){
-            _callback(this);
+        inline sockaddr * getSockAddr(){
+            return reinterpret_cast<sockaddr *>(sock_addr);
         }
 
+        inline socklen_t * getSockLen(){
+            return &len;
+        }
+
+        inline void recordWriteBytes(size_t written_bytes){
+            _buf->hasWritten(written_bytes);
+        }
+
+        inline void recordReadBytes(size_t read_bytes){
+            _buf->hasRead(read_bytes);
+        }
+
+        inline void clearBuffer(){
+            _buf->clear();
+        }
+
+        inline void append(const std::string & str){
+            _buf->append(str);
+        }
     private:
         int _fd;
         int event_status;
         Buffer * _buf;
-        EventHandler _callback;
+        sockaddr_in * sock_addr;
+        socklen_t len;
+        //EventHandler _callback;
     };
 }

@@ -1,4 +1,5 @@
 #include "Rpc/buffer.h"
+#include <iostream>
 
 namespace GcRpc{
     Buffer::Buffer():readIndex(0), writeIndex(0), buf(MAX_BUFFER_SIZE){
@@ -99,7 +100,7 @@ namespace GcRpc{
         readIndex = (readIndex + size) % MAX_BUFFER_SIZE;
     }
 
-    uint16_t Buffer::append(std::string & str){
+    uint16_t Buffer::append(const std::string & str){
         int size = str.length();
         return append(str.c_str(), size);
     }
@@ -115,6 +116,7 @@ namespace GcRpc{
     }
 
     const std::string Buffer::retrieveAllBufferAsString(){
+        int n = readableBytes();
         return std::move(read(readableBytes()));
     }
 }

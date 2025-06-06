@@ -1,1 +1,0 @@
-/usr/bin/g++ -g CMakeFiles/test_logger.dir/test_logger.cc.o -o /home/ermis/vs_project/GcRPC/bin/test_logger   -L/home/ermis/vs_project/GcRPC/lib  -Wl,-rpath,/home/ermis/vs_project/GcRPC/lib /home/ermis/vs_project/GcRPC/lib/libgcspdlog.so 

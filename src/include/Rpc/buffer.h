@@ -64,7 +64,7 @@ namespace GcRpc{
         /**
          * @brief append a string after the writeIndex.
          */
-        uint16_t append(std::string & str);
+        uint16_t append(const std::string & str);
 
         /**
          * @overload a overload of uint16_t append(std::string);

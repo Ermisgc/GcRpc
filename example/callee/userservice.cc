@@ -12,7 +12,7 @@ int main(int argc, char** argv){
     GcRpc::RpcProvider provider;
     provider.Notify(new GcRpc::LoginService());
 
-    provider.run();
+    provider.loop();
 
     std::cout << "run done" << std::endl;
     return 0;

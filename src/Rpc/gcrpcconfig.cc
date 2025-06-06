@@ -40,7 +40,7 @@ void GcRpcConfig::LoadConfigFile(const char * config_file){
     ifs.close();
 }
 
-std::string GcRpcConfig::Load(std::string & key){
+std::string GcRpcConfig::Load(const std::string & key){
     if(m_configMap.find(key) != m_configMap.end()){
         return m_configMap[key];
     }

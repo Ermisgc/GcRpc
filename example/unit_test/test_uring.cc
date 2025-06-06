@@ -47,18 +47,22 @@ int main(int argc, char *argv[]) {
         close(sockfd);
         return false;
     }
+
+    struct sockaddr_in client_addr;
+    socklen_t client_addr_len = sizeof(client_addr);
     char * buffer[BUFFER_SIZE];
-    //开始接收
-    while(1){
+    for(int i = 0;i < ENTITY_SIZE; ++i){
         struct io_uring_sqe * sqe = io_uring_get_sqe(&ring);
-        struct io_uring_user_info * info = new io_uring_user_info;;
+        struct io_uring_user_info * info = new io_uring_user_info;
         info->fd = 0;
         info->event = USER_EVENT_ACCEPT;
         sqe->user_data = (unsigned long long)info;
 
-        struct sockaddr_in client_addr;
-        socklen_t client_addr_len = sizeof(client_addr);
         io_uring_prep_accept(sqe, sockfd, (sockaddr*)&client_addr, &client_addr_len, SOCK_NONBLOCK | SOCK_CLOEXEC);
+    }
+    //开始接收
+    while(1){
+
         io_uring_submit(&ring);
 
         struct io_uring_cqe *cqes[MAX_CQES];
@@ -93,7 +97,8 @@ int main(int argc, char *argv[]) {
                 break;
 
             case USER_EVENT_CLOSE:
-                delete info;
+                info->event = USER_EVENT_ACCEPT;
+                io_uring_prep_accept(another_sqe, sockfd, (sockaddr*)&client_addr, &client_addr_len, SOCK_NONBLOCK | SOCK_CLOEXEC);
                 break;
                 
             default:

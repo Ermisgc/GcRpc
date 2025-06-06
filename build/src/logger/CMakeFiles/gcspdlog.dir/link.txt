@@ -1,1 +1,0 @@
-/usr/bin/g++ -fPIC -g -shared -Wl,-soname,libgcspdlog.so -o /home/ermis/vs_project/GcRPC/lib/libgcspdlog.so CMakeFiles/gcspdlog.dir/formatter.cc.o CMakeFiles/gcspdlog.dir/logger.cc.o CMakeFiles/gcspdlog.dir/registry.cc.o CMakeFiles/gcspdlog.dir/sink.cc.o   -L/home/ermis/vs_project/GcRPC/lib 
