@@ -1,5 +1,5 @@
 #include "login_service.h"
-#include "test.pb.h"
+#include "user.pb.h"
 #include "Rpc/gcrpcapplication.h"
 #include "Rpc/rpc_caller.h"
 #include <google/protobuf/service.h>

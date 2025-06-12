@@ -13,6 +13,7 @@ namespace GcRpc{
     class EventLoop;
     class Channel;
     class LogMsg;
+    class IProtocalDetector;
     using LockFreeChannelQueue = moodycamel::ConcurrentQueue<Channel *>;
     using LockFreeLogQueue = moodycamel::ConcurrentQueue<LogMsg>;
     using Service = ::google::protobuf::Service;

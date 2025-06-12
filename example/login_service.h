@@ -1,4 +1,4 @@
-#include "test.pb.h"
+#include "user.pb.h"
 #include <google/protobuf/service.h>
 
 namespace GcRpc{
@@ -9,10 +9,6 @@ namespace GcRpc{
         void Login(::google::protobuf::RpcController* controller,
             const ::gctemp::LoginRequest* request,
             ::gctemp::LoginResponse* response,
-            ::google::protobuf::Closure* done);
-        void GetFriendLists(::google::protobuf::RpcController* controller,
-            const ::gctemp::GetFriendListRequest* request,
-            ::gctemp::GetFriendListResponse* response,
             ::google::protobuf::Closure* done);
         
     private:

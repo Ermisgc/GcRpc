@@ -5,6 +5,7 @@
 #include "sys/socket.h"
 #include "arpa/inet.h"
 #include "Rpc/gcrpcapplication.h"
+#include "Rpc/rpc_protocal.h"
 using namespace GcRpc;
 
 #define p(n) std::cout << n << std::endl;
@@ -15,18 +16,17 @@ using namespace GcRpc;
 
 RpcProvider::RpcProvider(): ring(), params(), _status(PROVIDER_UNSTART){
     std::cout << ">>> " << "IO_uring is initializing ..." << std::endl;
-    // params.sq_entries = stoi(GcRpcApplication::Load("sq_entries"));
-    // params.cq_entries = stoi(GcRpcApplication::Load("cq_entries"));
     memset(&params, 0, sizeof(params));
     int ret = io_uring_queue_init_params(stoi(GcRpcApplication::Load("sq_entries")), &ring, &params);
     if(ret < 0){
         std::cerr << ">>> [-] Failed to initialize io_uring: " << strerror(-ret) << std::endl;
         throw std::runtime_error("io_uring initialization failed");
     }
+#ifdef _Debug
     std::cout << ">>> " << "sq_entries:" << params.sq_entries << std::endl;
     std::cout << ">>> " << "cq_entries:" << params.cq_entries << std::endl;
     std::cout << ">>> " << "IO_uring initialization done !!!" << std::endl;
-
+#endif
     _fd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
     if(_fd < 0){
         std::cerr << "Failed to create socket: " << strerror(errno) << std::endl;
@@ -64,9 +64,9 @@ void RpcProvider::Notify(::google::protobuf::Service * new_service){
 void RpcProvider::loop(){
     for(int i = 0;i < params.sq_entries; ++i){
         io_uring_sqe * sqe = io_uring_get_sqe(&ring);
-        Channel * one = new Channel(0); 
+        Channel * one = new Channel(0);  
         socklen_t * len = one->getSockLen();
-        sqe->user_data = (unsigned long long)one;
+        sqe->user_data = reinterpret_cast<unsigned long long>(one);
         io_uring_prep_accept(sqe, _fd, one->getSockAddr(), len, SOCK_NONBLOCK | SOCK_CLOEXEC);
     }
     _status.store(PROVIDER_LOOPING);
@@ -80,12 +80,17 @@ void RpcProvider::loop(){
         for(int i = 0;i < finish_count; ++i){
             struct io_uring_cqe * cqe_now = cqes[i];
             if(cqe_now->res < 0){  //TODO:Error handling
-                std::cout << ">>> [-] I/O Operation fails" << std::endl;
+                std::cout << ">>> [-] I/O Operation fails: " << strerror(-cqe_now->res) << std::endl;
+                if(!cqe_now->user_data) std::cout << "nullptr of user_data" << std::endl;
+                else {
+                    Channel * channel = (Channel*)cqe_now->user_data;
+                    channel->setEventStatus(USER_EVENT_CLOSE);
+                }
             }
             
-            Channel * channel = (Channel*)cqe_now->user_data;
+            Channel * channel = reinterpret_cast<Channel*>(cqe_now->user_data);
             struct io_uring_sqe * another_sqe = io_uring_get_sqe(&ring);
-            another_sqe->user_data = (unsigned long long)channel;
+            another_sqe->user_data = reinterpret_cast<unsigned long long>(channel);
 
             switch (channel->eventStatus())
             {
@@ -93,7 +98,7 @@ void RpcProvider::loop(){
                 channel->setFd(cqe_now->res);
                 channel->setEventStatus(USER_EVENT_READ);
                 io_uring_prep_readv(another_sqe, channel->fd(), channel->getWriteBuffer(), 2, 0);
-                p(0);
+                // p("accept");
                 break;
             
             case USER_EVENT_READ:   // send 
@@ -101,20 +106,20 @@ void RpcProvider::loop(){
                 //TODO:Ring Buffer have to move after write
                 channel->recordWriteBytes(cqe_now->res);
                 threadPond->execute(std::bind(&RpcProvider::onMessage, this, channel));
-                p(1);
+                // p("read");
                 break;
 
             case USER_EVENT_WRITE:
                 channel->setEventStatus(USER_EVENT_CLOSE);
                 io_uring_prep_close(another_sqe, channel->fd());
-                p(2);
+                // p("write");
                 break;
 
             case USER_EVENT_CLOSE:
                 channel->setEventStatus(USER_EVENT_ACCEPT);
                 channel->setFd(0);
                 channel->clearBuffer();
-                p(3);
+                // p("close");
                 io_uring_prep_accept(another_sqe, _fd, channel->getSockAddr(), channel->getSockLen(), SOCK_NONBLOCK | SOCK_CLOEXEC);
                 break;
 
@@ -147,43 +152,31 @@ void RpcProvider::onMessage(Channel * channel){
 }
 
 void RpcProvider::parseProtoMessage(const std::string & recv_str, Channel * channel){
-    //std::cout << ">>> Recv:" << std::hex << recv_str.c_str() << std::endl;
-    int header_size = 0;
-    try{
-        header_size = stoi(recv_str.substr(0, 4));
-    } catch(std::exception & e) {
+    RequestInformation recv_info;
+    if(!parserProtocalFromString(recv_str, recv_info)){
+        std::cerr << std::dec << ">>> Cannot parse from received string: " << recv_str << std::endl;
         return;
     }
-    RpcHeader header;
-    //std::cout << ">>> Header:" << std::hex << recv_str.substr(4, header_size) << std::endl;
-    if(!header.ParseFromString(recv_str.substr(4, header_size))){
-        std::cerr << std::dec << ">>> RpcHeader cannot parse from received string" << std::endl;
-        _status.store(PROVIDER_STOP);
-        close(_fd);
-    }
-
-    //Parse The Header
-    const std::string & service_name = header.service_name();
-    if(serviceTable.find(service_name) == serviceTable.end()){
-        std::cout << "Service " + service_name + " is not existed" << std::endl;
-        return;
-    }
-    const std::string & method_name = header.method_name();
-    const uint32_t args_size = header.args_size();
 
     //Call the Service
-    MethodTable & method_table = serviceTable[service_name];
-    const ::google::protobuf::MethodDescriptor * desc = method_table.methodTable[method_name];
+    if(serviceTable.find(recv_info.service_name) == serviceTable.end()){
+        std::cerr << std::dec << ">>> Service is not supported: " << recv_info.service_name << std::endl;
+        return;
+    }
+    MethodTable & method_table = serviceTable[recv_info.service_name];
+    if(method_table.methodTable.find(recv_info.method_name) == method_table.methodTable.end()){
+        std::cerr << std::dec << ">>> Service: " << recv_info.service_name << " has no method named: " << recv_info.method_name << std::endl;
+        return;
+    }
+    const ::google::protobuf::MethodDescriptor * desc = method_table.methodTable[recv_info.method_name];
     ::google::protobuf::Message* request_message = method_table.service->GetRequestPrototype(desc).New();
 
-    if(!request_message->ParseFromString(recv_str.substr(4 + header_size, args_size))){
-        throw "RequestMessage cannot parse from received string";
-    }
     ::google::protobuf::Message * response_message = method_table.service->GetResponsePrototype(desc).New();
     //TODO: finish the CallMethod here.
-    method_table.service->CallMethod(method_table.methodTable[method_name], nullptr, request_message, response_message, nullptr);
+    method_table.service->CallMethod(method_table.methodTable[recv_info.method_name], nullptr, request_message, response_message, nullptr);
 
     //然后现在要把这个response_message写出去：
+    recv_info.message_type = MESSAGE_TYPE_RESPONSE;
     std::string send_str = response_message->SerializeAsString();
     channel->append(send_str);
 }

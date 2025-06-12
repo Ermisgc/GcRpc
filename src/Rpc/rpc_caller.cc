@@ -3,6 +3,7 @@
 #include "Rpc/generic_rpc.pb.h"
 #include "sys/socket.h"
 #include "arpa/inet.h"
+#include "Rpc/rpc_protocal.h"
 #include <iostream>
 #include <charconv>
 #include <google/protobuf/descriptor.h>
@@ -27,20 +28,19 @@ void RpcCaller::CallMethod(const ::google::protobuf::MethodDescriptor* method,
     ::google::protobuf::Message* response, ::google::protobuf::Closure* done){
     std::string serializedString_args = request->SerializeAsString();
     
-    GcRpc::RpcHeader header;
-    header.set_method_name(method->name());
-    header.set_service_name(method->service()->name());
-    header.set_args_size(serializedString_args.length());
-    std::string serializedString_header = header.SerializeAsString();
+    //根据协议发送请求
+    RequestInformation info;
+    info.method_name = method->name();
+    info.body_data = serializedString_args;
+    info.service_name = method->service()->name();
+    info.message_type = MESSAGE_TYPE_REQUEST;
+    info.flag = 0;
+    info.status = STATUS_SUCCESS;
+    info.version = 0;
+    info.request_id = 0x12345678;
+    std::string send_str;
+    generateStringFromProtocal(info, send_str);
 
-    //这里要把serializedString_header.length()改为四个字节的整数
-    char len_str[4];
-    auto [ptr, ec] = std::to_chars(len_str, len_str + 4, serializedString_header.length(), 10);
-    std::string len_padded(4 - (ptr - len_str), '0');
-    len_padded.append(len_str, ptr);
-
-    std::string send_str = len_padded + serializedString_header + serializedString_args;
-    //std::cout << send_str << std::endl;
     if(send(sockfd, send_str.c_str(), send_str.length(), 0) <= 0){
         std::cout << ">>> Fail to send:" << send_str << std::endl;
         return;
@@ -48,11 +48,10 @@ void RpcCaller::CallMethod(const ::google::protobuf::MethodDescriptor* method,
 
     static int max_buffer_size = stoi(GcRpcApplication::Load("max_buffer_size"));
     char buf[max_buffer_size];
-    if(recv(sockfd, buf, max_buffer_size, 0) < 0){  //阻塞
+    if(recv(sockfd, buf, max_buffer_size, 0) < 0){  //blocking
         std::cout << ">>> Fail to recv:" << send_str << std::endl;
         return;
     }
-
     response->ParseFromString(buf);
 }
 }

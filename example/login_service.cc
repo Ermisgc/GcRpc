@@ -16,14 +16,14 @@ namespace GcRpc{
             if(done) done->Run();
         }
     
-    // TODO:GetFriendLists not implement yet
-    void LoginService::GetFriendLists(::google::protobuf::RpcController* controller,
-        const ::gctemp::GetFriendListRequest* request,
-        ::gctemp::GetFriendListResponse* response,
-        ::google::protobuf::Closure* done){
-            if(done) done->Run();
+    // // TODO:GetFriendLists not implement yet
+    // void LoginService::GetFriendLists(::google::protobuf::RpcController* controller,
+    //     const ::gctemp::GetFriendListRequest* request,
+    //     ::gctemp::GetFriendListResponse* response,
+    //     ::google::protobuf::Closure* done){
+    //         if(done) done->Run();
 
-        }
+    //     }
 
     bool LoginService::Login(std::string name, std::string psw){
         std::cout << name << ": " << psw << std::endl;
