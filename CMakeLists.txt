@@ -7,11 +7,14 @@ SET(CMAKE_C_COMPILER /usr/bin/gcc)
 SET(CMAKE_CXX_COMPILER /usr/bin/g++)
 
 # 可以指定更多的信息，比如加一个版本号
-project ("learn_cmake")
+project ("GcRpc")
 
 # C++编译器设置
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+find_package(Protobuf REQUIRED)
+include_directories(${Protobuf_INCLUDE_DIRS})
 
 # using gdb
 set(CMAKE_BUILD_TYPE "Debug")
