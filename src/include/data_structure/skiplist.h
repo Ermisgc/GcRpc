@@ -26,7 +26,7 @@ namespace gcdst{
         
         skiplist(int _max_level = 32): header(new Node(_max_level)), cur_level(0), max_level(_max_level){}
         //deepcopy
-        skiplist(const skiplist & other) = delete; //waiting for completion
+        skiplist(const skiplist & other) = delete; //TODO:waiting for completion
 
         //move_copy
         skiplist(skiplist && other){

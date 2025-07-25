@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package GcRpc;
+
+message RpcNodeInfo{
+    //bytes addr;
+    uint32 addr = 1;
+    uint32 port = 2;
+    uint32 active_conn = 3;
+    uint32 max_conn = 4;
+    optional float cpu_util = 5;
+    optional float mem_util = 6;
+}
