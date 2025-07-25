@@ -5,18 +5,9 @@
 #include <google/protobuf/service.h>
 #include "Rpc/net_base.h"
 
+
 namespace GcRpc{
-    class ServiceDiscovery;
     class CircuitBreak;
-    class RpcCaller;
-
-    class LoadBalancer{
-    public:
-        virtual ~LoadBalancer() = default;
-
-        //虚函数，从节点列表中
-        virtual ServiceEndpoint select(const std::vector<ServiceEndpoint> & endpoints) = 0;
-    };
 
     class RpcCaller: public ::google::protobuf::RpcChannel{
         //RpcCaller() = delete;

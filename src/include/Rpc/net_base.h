@@ -5,7 +5,8 @@
 #include <stdlib.h>
 #include <string>
 #include "rpc_node_info.pb.h"
-// #include <etcd/Response.hpp>
+#include "data_structure/hashheap.hpp"
+#include <etcd/Response.hpp>
 
 namespace GcRpc{
     /**
@@ -45,19 +46,23 @@ namespace GcRpc{
     //服务节点
     struct ServiceEndpoint{
         // int port;
-        int active_conns;
-        int max_conns;
+        uint32_t active_conns;
+        uint32_t max_conns;
         //cpu_util 和 memory_util这两个利用率，说实话在我这里用处不是很大，因为服务端获取这个消息需要进行系统调用
         //从而且是cpu和memory两次系统调用，要额外发生4次用户态、内核态的切换，代价有点大，因此只考虑active_conns和max_conns
         float cpu_util;  
         float memory_util;  
-        int load_score;   //应该是
+        float load_score;   //负载分数
         int circuit_time;
-        std::string serviceName;
+        // std::string serviceName;
         InetAddr * addr;
 
         std::string fullAddress() const {
             return addr->ipString() + ":" + addr->portString();
+        }
+
+        ~ServiceEndpoint() noexcept{
+            if(addr) delete addr;
         }
     };
 
@@ -67,16 +72,9 @@ namespace GcRpc{
         LBT_SCORE = 2
     };
 
+    using EndPointList = gcdst::HashHeap<std::string, float>;
+
     //从etcd返回的节点value（经过protobuf编译）中, 
     //TODO:还没写完呢
-    // ServiceEndpoint parserNodeFromEtcd(const etcd::Value & value){
-    //     auto key = value.key();
-    //     auto v = value.as_string();
-    //     GcRpc::RpcNodeInfo node_info;
-    //     node_info.ParseFromString(v);
-
-    //     ServiceEndpoint ret;
-    //     // ret.ip =
-    //     return ret; 
-    // }
+    void parserNodeFromEtcd(const etcd::Value & value, ServiceEndpoint & ep);
 }

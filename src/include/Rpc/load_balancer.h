@@ -1,33 +1,31 @@
 #include "net_base.h"
-#include "data_structure/hashheap.hpp"
 #include <vector>
 #include <string>
 #include <optional>
 #include <atomic>
 
 namespace GcRpc{
-    using EndPointList = gcdst::HashHeap<ServiceEndpoint *, int>;
 
     class LoadBalancer{
     public:
         virtual ~LoadBalancer() = default;
-        virtual std::optional<ServiceEndpoint *> select(const EndPointList & endpoints) = 0;
+        virtual std::optional<std::string> select(const EndPointList & endpoints) = 0;
     };
 
     class RandomRuleBalancer :public LoadBalancer{
     public:
-        std::optional<ServiceEndpoint *> select(const EndPointList & endpoints) override;
+        std::optional<std::string> select(const EndPointList & endpoints) override;
     };
 
     class RoundRobinBalancer :public LoadBalancer {
         std::atomic<size_t> counter{0};
     public:
-        std::optional<ServiceEndpoint *> select(const EndPointList & endpoints) override;        
+        std::optional<std::string> select(const EndPointList & endpoints) override;        
     };
 
     class BestScoreBalancer :public LoadBalancer {
     public:
-        std::optional<ServiceEndpoint *> select(const EndPointList & endpoints) override;  
+        std::optional<std::string> select(const EndPointList & endpoints) override;  
     };
 
     //简单工厂模式，用于产出一个LoadBalancer的具体类

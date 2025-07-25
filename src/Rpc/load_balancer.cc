@@ -1,11 +1,11 @@
 #include "Rpc/load_balancer.h"
 namespace GcRpc{
 
-    std::optional<ServiceEndpoint *> RandomRuleBalancer::select(const EndPointList & endpoints){
+    std::optional<std::string> RandomRuleBalancer::select(const EndPointList & endpoints){
         return endpoints.randomOne();
     }
 
-    std::optional<ServiceEndpoint *> RoundRobinBalancer::select(const EndPointList & endpoints){
+    std::optional<std::string> RoundRobinBalancer::select(const EndPointList & endpoints){
         //CAS操作
         while(1){
             size_t key = counter.load(); 
@@ -15,7 +15,7 @@ namespace GcRpc{
         }
     }
 
-    std::optional<ServiceEndpoint *> BestScoreBalancer::select(const EndPointList & endpoints){
+    std::optional<std::string> BestScoreBalancer::select(const EndPointList & endpoints){
         return endpoints.maxOne();
     }  
 }

@@ -86,6 +86,14 @@ namespace gcdst{
             return key_index.size();
         }
 
+        void clear() {
+            std::unique_lock<std::mutex> locker(mtx);
+            sorted_scores.clear();
+            key_index.clear();
+            random_list.clear();
+            key_to_random_list.clear();
+        }
+
     private:
         void add_random_key(const Key & key){
             random_list.push_back(&key);
@@ -99,7 +107,7 @@ namespace gcdst{
 
             random_list.pop_back();
             key_to_random_list.erase(key);
-            key_to_random_list[random_list[pos_key]] = pos_key;
+            key_to_random_list[*random_list[pos_key]] = pos_key;
         }
     };
 

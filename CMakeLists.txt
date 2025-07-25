@@ -13,8 +13,12 @@ project ("GcRpc")
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# protobuf
 find_package(Protobuf REQUIRED)
 include_directories(${Protobuf_INCLUDE_DIRS})
+
+# Etcd
+set(ETCD_LIB etcd-cpp-api cpprest)
 
 # using gdb
 set(CMAKE_BUILD_TYPE "Debug")
