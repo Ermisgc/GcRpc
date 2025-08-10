@@ -28,7 +28,6 @@ namespace gchipe{
         DynamicThreadPool() = delete;
         
         //the initial number of thread;
-        
         static DynamicThreadPool * getInstance(unsigned int th_num = 1);
         ~DynamicThreadPool();
 
@@ -66,7 +65,7 @@ namespace gchipe{
                     std::cout << "Task queue overflow" << std::endl;
                     return;
                 }
-                tasks.emplace(HipeTask(std::forward<_Callable>(task)));
+                tasks.emplace(std::forward<_Callable>(task));
             }
             wait_cv.notify_one();
         }

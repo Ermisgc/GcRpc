@@ -6,6 +6,8 @@
 #include "arpa/inet.h"
 #include "Rpc/gcrpcapplication.h"
 #include "Rpc/rpc_protocal.h"
+#include <etcd/KeepAlive.hpp>
+#include "Rpc/rpc_node_info.pb.h"
 using namespace GcRpc;
 
 #define p(n) std::cout << n << std::endl;
@@ -14,8 +16,20 @@ using namespace GcRpc;
 #define PROVIDER_WAIT_TO_STOP 2
 #define PROVIDER_STOP 3
 
-RpcProvider::RpcProvider(): ring(), params(), _status(PROVIDER_UNSTART){
+std::atomic<int> RpcProvider::_status = PROVIDER_UNSTART;
+
+RpcProvider::RpcProvider(): ring(), params(),  _etcd(GcRpcApplication::Load("etcd_addr")){
     std::cout << ">>> " << "IO_uring is initializing ..." << std::endl;
+    //检测etcd是否有效
+    try {
+        auto response = _etcd.get("health_check_key").get();
+    }
+    catch (const std::exception& e) {
+        std::cerr << "etcd error: " << e.what() << std::endl;
+        throw("ETCD SERVICE NOT PROVIDED");
+    }
+    
+    //创建io_uring
     memset(&params, 0, sizeof(params));
     int ret = io_uring_queue_init_params(stoi(GcRpcApplication::Load("sq_entries")), &ring, &params);
     if(ret < 0){
@@ -41,10 +55,23 @@ RpcProvider::RpcProvider(): ring(), params(), _status(PROVIDER_UNSTART){
         throw std::runtime_error("Socket bind failed");
     }
 
+    //初始化线程池
     threadPond = gchipe::DynamicThreadPool::getInstance(stoi(GcRpcApplication::Load("worker_thread")));
-    feedback_queue = new LockFreeChannelQueue();
+    
+    _max_conn = stoi(GcRpcApplication::Load("max_conn"));
+    
+    //TODO:连接管理器的初始连接数量需要由文件设定
+    _connection_manager = std::make_unique<ConnectionManager>(_fd, this, params.sq_entries, _max_conn);
+
+
+    signal(SIGINT, [](int sig){RpcProvider::sigint_handler(sig);});
 }
-RpcProvider::~RpcProvider(){
+
+RpcProvider::~RpcProvider() noexcept{
+    unRegisterEtcdServices();
+    auto sqe = getOneSqe();
+
+    io_uring_prep_cancel(sqe, (void * )(uintptr_t) - 1, IORING_ASYNC_CANCEL_ALL);
 }
 
 void RpcProvider::Notify(::google::protobuf::Service * new_service){
@@ -62,23 +89,52 @@ void RpcProvider::Notify(::google::protobuf::Service * new_service){
 }
 
 void RpcProvider::loop(){
-    for(int i = 0;i < params.sq_entries; ++i){
-        io_uring_sqe * sqe = io_uring_get_sqe(&ring);
-        Channel * one = new Channel(0);  
-        socklen_t * len = one->getSockLen();
-        sqe->user_data = reinterpret_cast<unsigned long long>(one);
-        io_uring_prep_accept(sqe, _fd, one->getSockAddr(), len, SOCK_NONBLOCK | SOCK_CLOEXEC);
+    //申请一个keepalive租约并且一直执行keepalive：
+    //TODO:改用RAII来管理租约行为，类创建时获取租约，类析构时释放租约，并且提供租约自动续租类
+    constexpr int ttl = 20;  //lease续租有效期20s
+    _lease_keeper = _etcd.leasekeepalive(ttl).get();
+    _lease_id = _lease_keeper->Lease();
+
+    for(const auto & pr: serviceTable){
+        const std::string etcd_node_key = "/services/" + pr.first + "/" + getLocalIP();
+        RpcNodeInfo info;
+
+        //addr->uint32_t
+        info.set_addr(inet_addr(getLocalIP().c_str()));
+        info.set_active_conn(this->_active_conn);
+        info.set_port(1214);   //本服务的端口号
+        info.set_max_conn(this->_max_conn);
+
+        const std::string etcd_node_value = info.SerializeAsString();
+
+        auto put_resp = _etcd.put(etcd_node_key, etcd_node_value, _lease_id);
+
+        if(!put_resp.is_done()){
+            std::cout << ">>> Service " << pr.first << " fails to registered to etcd. " << std::endl;
+        }
     }
+
     _status.store(PROVIDER_LOOPING);
 
-    ::listen(_fd, 100);
+    //此处的listen一定要比accept先做
+    ::listen(_fd, params.sq_entries);
+
+    //创建若干个io_uring接收缓冲区
     io_uring_cqe * cqes[params.cq_entries];
+
+    //开始事件循环
     while(_status == PROVIDER_LOOPING){
+        //设置accept
+        _connection_manager->acceptForCount(params.sq_entries);
+        
+        //批量化提交io_uring
         io_uring_submit(&ring);
+
+        //获得返回值
         int finish_count = io_uring_peek_batch_cqe(&ring, cqes, params.cq_entries);
-        //std::cout <<">>> finish_count:" << finish_count << std::endl;
         for(int i = 0;i < finish_count; ++i){
             struct io_uring_cqe * cqe_now = cqes[i];
+            executeIOUringCallback(cqe_now->user_data, cqe_now->res);
             if(cqe_now->res < 0){  //TODO:Error handling
                 std::cout << ">>> [-] I/O Operation fails: " << strerror(-cqe_now->res) << std::endl;
                 if(!cqe_now->user_data) std::cout << "nullptr of user_data" << std::endl;
@@ -88,97 +144,73 @@ void RpcProvider::loop(){
                 }
             }
             
-            Channel * channel = reinterpret_cast<Channel*>(cqe_now->user_data);
-            struct io_uring_sqe * another_sqe = io_uring_get_sqe(&ring);
-            another_sqe->user_data = reinterpret_cast<unsigned long long>(channel);
-
-            switch (channel->eventStatus())
-            {
-            case USER_EVENT_ACCEPT:
-                channel->setFd(cqe_now->res);
-                channel->setEventStatus(USER_EVENT_READ);
-                io_uring_prep_readv(another_sqe, channel->fd(), channel->getWriteBuffer(), 2, 0);
-                // p("accept");
-                break;
-            
-            case USER_EVENT_READ:   // send 
-                channel->setEventStatus(USER_EVENT_WRITE);
-                //TODO:Ring Buffer have to move after write
-                channel->recordWriteBytes(cqe_now->res);
-                threadPond->execute(std::bind(&RpcProvider::onMessage, this, channel));
-                // p("read");
-                break;
-
-            case USER_EVENT_WRITE:
-                channel->setEventStatus(USER_EVENT_CLOSE);
-                io_uring_prep_close(another_sqe, channel->fd());
-                // p("write");
-                break;
-
-            case USER_EVENT_CLOSE:
-                channel->setEventStatus(USER_EVENT_ACCEPT);
-                channel->setFd(0);
-                channel->clearBuffer();
-                // p("close");
-                io_uring_prep_accept(another_sqe, _fd, channel->getSockAddr(), channel->getSockLen(), SOCK_NONBLOCK | SOCK_CLOEXEC);
-                break;
-
-            default: 
-                break;
-            }
             io_uring_cqe_seen(&ring, cqe_now);
         }
 
-        bool dequeueSuccess = true;
-        while(dequeueSuccess){
-            Channel * feedback_channel;
-            dequeueSuccess = feedback_queue->try_dequeue(feedback_channel);
-            if(dequeueSuccess){
-                struct io_uring_sqe * another_sqe = io_uring_get_sqe(&ring);
-                another_sqe->user_data = (unsigned long long)feedback_channel;
-                io_uring_prep_writev(another_sqe, feedback_channel->fd(), feedback_channel->getReadBuffer(), 2, 0);
-            }
-        }
+        //检查租约是否还在
+        healthCheck();
     }
 }
 
-void RpcProvider::onConnection(){
-}
-
-void RpcProvider::onMessage(Channel * channel){
-    parseProtoMessage(channel->retrieveAllBufferAsString(), channel);
-    channel->setEventStatus(USER_EVENT_WRITE);
-    feedback_queue->enqueue(channel);
-}
-
-void RpcProvider::parseProtoMessage(const std::string & recv_str, Channel * channel){
-    RequestInformation recv_info;
-    if(!parserProtocalFromString(recv_str, recv_info)){
-        std::cerr << std::dec << ">>> Cannot parse from received string: " << recv_str << std::endl;
-        return;
-    }
-
+void RpcProvider::onMessage(RequestInformation && ri){
     //Call the Service
-    if(serviceTable.find(recv_info.service_name) == serviceTable.end()){
-        std::cerr << std::dec << ">>> Service is not supported: " << recv_info.service_name << std::endl;
+    if(serviceTable.find(ri.service_name) == serviceTable.end()){
+        std::cerr << std::dec << ">>> Service is not supported: " << ri.service_name << std::endl;
         return;
     }
-    MethodTable & method_table = serviceTable[recv_info.service_name];
-    if(method_table.methodTable.find(recv_info.method_name) == method_table.methodTable.end()){
-        std::cerr << std::dec << ">>> Service: " << recv_info.service_name << " has no method named: " << recv_info.method_name << std::endl;
+    MethodTable & method_table = serviceTable[ri.service_name];
+    if(method_table.methodTable.find(ri.method_name) == method_table.methodTable.end()){
+        std::cerr << std::dec << ">>> Service: " << ri.service_name << " has no method named: " << ri.method_name << std::endl;
         return;
     }
-    const ::google::protobuf::MethodDescriptor * desc = method_table.methodTable[recv_info.method_name];
+
+    const ::google::protobuf::MethodDescriptor * desc = method_table.methodTable[ri.method_name];
     ::google::protobuf::Message* request_message = method_table.service->GetRequestPrototype(desc).New();
 
     ::google::protobuf::Message * response_message = method_table.service->GetResponsePrototype(desc).New();
-    //TODO: finish the CallMethod here.
-    method_table.service->CallMethod(method_table.methodTable[recv_info.method_name], nullptr, request_message, response_message, nullptr);
+    method_table.service->CallMethod(method_table.methodTable[ri.method_name], nullptr, request_message, response_message, nullptr);
 
     //然后现在要把这个response_message写出去：
-    recv_info.message_type = MESSAGE_TYPE_RESPONSE;
+    // ri.message_type = MESSAGE_TYPE_RESPONSE;
     std::string send_str = response_message->SerializeAsString();
-    channel->append(send_str);
+
+    if(ri.flag == 0){
+        ri.conn->send(std::move(send_str));
+    } else if(ri.flag == 1){  //发送完毕后关闭
+        ri.conn->sendThenClose(std::move(send_str));
+    } else {
+        std::cerr << "invalid flag" << std::endl;
+    }
+    
+}
+
+void RpcProvider::unRegisterEtcdServices(){
+    //撤销租约
+    auto resp = _etcd.leaserevoke(_lease_id);
+}
+
+void RpcProvider::healthCheck(){
+    //TODO:healthCheck
+}
+
+void RpcProvider::sigint_handler(int sig){
+	if(sig == SIGINT){
+		// ctrl+c退出时执行的代码
+		std::cout << "ctrl+c pressed!" << std::endl;
+		_status.store(PROVIDER_WAIT_TO_STOP);
+	}
+}
+
+struct io_uring_sqe * RpcProvider::getOneSqe(){
+    return io_uring_get_sqe(&ring);
+}
+
+void RpcProvider::asyncHandleRequest(RequestInformation && ri){
+    threadPond->execute(
+        [this, ri = std::move(ri)]() mutable {  // 关键：移动捕获 ri
+            this->onMessage(std::move(ri));      // 在 lambda 内显式移动
+        }
+    );
 }
 
 #undef p

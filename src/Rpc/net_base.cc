@@ -13,11 +13,13 @@ namespace GcRpc{
         m_addr.sin_addr.s_addr = inet_addr(_ip);
         m_addr.sin_port = htons(atoi(_port));
     }
+
     InetAddr::InetAddr(uint32_t _ip, const char * _port){
         m_addr.sin_family = AF_INET;
         m_addr.sin_addr.s_addr = htonl(_ip);
         m_addr.sin_port = htons(atoi(_port));
     }
+    
     InetAddr::InetAddr(const char * _ip, uint16_t _port){
         m_addr.sin_family = AF_INET;
         m_addr.sin_addr.s_addr = inet_addr(_ip);
@@ -39,5 +41,40 @@ namespace GcRpc{
         catch (const std::exception & e){
             
         }
+    }
+
+    std::string getLocalIP(){
+        static std::string ip_str;
+        if(!ip_str.empty()){
+            return ip_str;
+        }
+
+        int sock = ::socket(AF_INET, SOCK_DGRAM, 0);
+        if(sock < 0){
+            std::string ip_str = "127.0.0.1";
+            return ip_str;  
+        }
+
+        const char * google_dns = "8.8.8.8";
+        uint16_t dns_port = 53;
+        sockaddr_in serv;
+        memset(&serv, 0, sizeof(serv));
+        serv.sin_family = AF_INET;
+        serv.sin_addr.s_addr = inet_addr(google_dns);
+        serv.sin_port = htons(dns_port);
+        
+        connect(sock, (const sockaddr*)&serv, sizeof(serv));
+        
+        sockaddr_in name;
+        socklen_t namelen = sizeof(name);
+        getsockname(sock, (sockaddr*)&name, &namelen);
+        
+        char buffer[INET_ADDRSTRLEN];
+        const char* p = inet_ntop(AF_INET, &name.sin_addr, buffer, sizeof(buffer));
+        close(sock);
+        
+        ip_str = p ? std::string(buffer) : "127.0.0.1";
+        // cout << ip_str << endl;
+        return ip_str;
     }
 }

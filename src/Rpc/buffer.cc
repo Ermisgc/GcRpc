@@ -2,7 +2,7 @@
 #include <iostream>
 
 namespace GcRpc{
-    Buffer::Buffer():readIndex(0), writeIndex(0), buf(MAX_BUFFER_SIZE){
+    Buffer::Buffer(size_t max_size):readIndex(0), writeIndex(0), buf(max_size){
     }
 
     Buffer::Buffer(const Buffer & other){ //deepcopy
@@ -40,7 +40,8 @@ namespace GcRpc{
                 std::string(buf.begin(), buf.begin() + readable + readIndex - MAX_BUFFER_SIZE);
         
         hasRead(readable);
-        return std::move(ans);
+        // return std::move(ans);
+        return ans;  //RVO自动返回值优化
     }
 
     uint16_t Buffer::readableBytes(){ 
@@ -117,6 +118,6 @@ namespace GcRpc{
 
     const std::string Buffer::retrieveAllBufferAsString(){
         int n = readableBytes();
-        return std::move(read(readableBytes()));
+        return read(readableBytes());
     }
 }

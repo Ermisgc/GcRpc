@@ -7,3 +7,9 @@ build/*
 lib/*
 
 test/*
+
+todo_list.md
+
+draw/*
+
+history_bin/*

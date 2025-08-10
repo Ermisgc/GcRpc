@@ -2,136 +2,143 @@
 #include <functional>
 
 namespace GcRpc{
-    ServiceSeeker::ServiceSeeker(std::shared_ptr<etcd::Client> client, const std::string & serviceName, std::shared_ptr<LoadBalancer> balancer): \
-        etcd_(client), serviceName_(serviceName) , balancer_(balancer), \
-        watcher_thread_(std::bind(&ServiceSeeker::thread_working, this)) {
-        //初始化服务列表
-        watcher_ = createWatcher();
-        initial_service_nodes();
-        startWatch();
-    }
-
-    ServiceSeeker::~ServiceSeeker(){
-        destorying_.store(true);
-        stopWatch();  //先停止再通知，否则容易导致线程退出时还在notify
-        watch_cv.notify_all();
-
-        if(watcher_thread_.joinable()) watcher_thread_.join();  //析构掉线程
-        if(watcher_) delete watcher_;
-    }
-
-    void ServiceSeeker::startWatch(){
-        std::lock_guard<std::mutex> lock(watch_mtx_);
-        watching_.store(true);
-        watch_cv.notify_one();
-    }
-
-    void ServiceSeeker::stopWatch(){
-        watching_.store(false);
-        {
-            std::unique_lock<std::mutex> locker(watch_mtx_);
-            if(!watcher_->Cancelled()) {
-                watcher_->Cancel();  //停止时必须确保完全停止了再退出，否则会一直Cancel
-            }  //这里要用锁来保护，以免仍处于函数调用阶段时watcher_被析构了
-        }
-    }
-
-    void ServiceSeeker::thread_working() noexcept{
-        while(!destorying_){
-            {
-                std::unique_lock<std::mutex> locker(watch_mtx_);
-                watch_cv.wait(locker, [this]()->bool{ return watching_ || destorying_; });
-                if(destorying_) break;
-            }
-
-            watcher_->Wait();
-        }
-    }
-
-    inline std::optional<InetAddr> ServiceSeeker::getService(){
-        auto node_name = balancer_->select(nodes_);
-        if(!node_name.has_value()) return std::nullopt;
-        {
-            std::unique_lock<std::mutex> locker(mtx_);
-            if(auto itr = nodes_pond_.find(node_name.value()); itr != nodes_pond_.end()){
-                return *itr->second.addr;
-            } else {
-                return std::nullopt;
-            }
-        }
-    }
-
-    void ServiceSeeker::reset(std::shared_ptr<etcd::Client> etcd_client, const std::string & serviceName, std::shared_ptr<LoadBalancer> balancer){
-        etcd_ = etcd_client;
-        serviceName_ = serviceName;
-        stopWatch();
-        delete watcher_;
-        balancer_ = balancer;
-        watcher_ = createWatcher();
-        {
-            std::unique_lock<std::mutex> locker(mtx_);
-            nodes_pond_.clear();
-        }
-        nodes_.clear();
-        initial_service_nodes();
-        startWatch();
-    }
-
-    etcd::Watcher * ServiceSeeker::createWatcher(){
-        return new etcd::Watcher (
-            *etcd_,
-            "/services/" + serviceName_ + "/",
-            [&](etcd::Response resp){
+    ServiceSeeker::ServiceSeeker(std::shared_ptr<LoadBalancer> balancer): \
+        _etcd(GcRpcApplication::Load("etcd_addr")), balancer_(balancer), \
+        _watcher_thread(std::bind(&ServiceSeeker::thread_working, this)) {        
+        _watcher = std::make_unique<etcd::Watcher>(
+            _etcd,
+            "/services/",  //监听所有services前缀
+            [this](etcd::Response resp){
                 auto events = resp.events();
                 for(const auto & event : events){
                     auto kv_ = event.kv();
-                    switch ( event.event_type())
-                    {
-                    case etcd::Event::EventType::PUT : {
-                        {
-                            std::unique_lock<std::mutex> locker(mtx_);
-                            if(auto itr = nodes_pond_.find(kv_.key()); itr != nodes_pond_.end()){
-                                ServiceEndpoint node = itr->second;
-                                parserNodeFromEtcd(kv_, node);
-                            } else {
-                                ServiceEndpoint new_node;
-                                parserNodeFromEtcd(kv_, new_node);
-                                nodes_pond_[kv_.key()] = std::move(new_node);
+                    std::string key = kv_.key();
+                    //然后从key当中提取出来service_name, key应该是:/services/serviceA/node1
+                    int pos1 = key.find('/', 2);  //pos1是从第二个字符开始往后找
+                    int pos2 = key.rfind('/');
+                    std::string service_name = key.substr(pos1 + 1, pos2 - pos1 - 1);
+                    std::string node_name = key.substr(pos2 + 1, key.size() - pos2 - 1);
+
+                    std::lock_guard<std::mutex> map_locker(_watch_mtx); 
+                    if(auto itr = _endpoint_map.find(service_name); itr == _endpoint_map.end()){
+                        //service_name并不在关心的服务里，直接返回
+                        continue;
+                    } else {
+                        auto & meta = itr->second;
+
+                        //这里在写入时应该是独写，要加锁
+                        switch ( event.event_type()) {
+                            case etcd::Event::EventType::PUT : {
+                                {   //这里被设定为唯一会写的地方，本线程其它的地方调用这个时不用加锁
+                                    std::lock_guard<std::mutex> locker(meta->pond_mtx);
+                                    if(auto it = meta->nodes_pond.find(node_name); it != meta->nodes_pond.end()){  //已经存在，那么就只做修改，否则的话，要新增   
+                                        ServiceEndpoint node = it->second;
+                                        parserNodeFromEtcd(kv_, node);
+                                    } else {   //要监听的key并不存在
+                                        ServiceEndpoint new_node;
+                                        parserNodeFromEtcd(kv_, new_node);
+                                        meta->nodes_pond[node_name] = std::move(new_node);
+                                    }
+                                }
+                                meta->node_list.insert(node_name, meta->nodes_pond[node_name].load_score);
+                                break;
                             }
+
+                            case etcd::Event::EventType::DELETE_: {  
+                                {
+                                    std::lock_guard<std::mutex> locker(meta->pond_mtx);
+                                    if(auto it = meta->nodes_pond.find(node_name); it != meta->nodes_pond.end()){
+                                        meta->nodes_pond.erase(node_name);
+                                    }
+                                }
+                                meta->node_list.remove(node_name);
+                                break;
+                            }
+
+                            default:
+                                break;
                         }
-                        nodes_.insert(kv_.key(), nodes_pond_[kv_.key()].load_score);
-                        break;
                     }
 
-                    case etcd::Event::EventType::DELETE_: {
-                        std::unique_lock<std::mutex> locker(mtx_);
-                        if(auto itr = nodes_pond_.find(kv_.key()); itr != nodes_pond_.end()){
-                            nodes_.remove(kv_.key());
-                            nodes_pond_.erase(kv_.key());
-                        }
-                        break;
-                    }
-
-                    default:
-                        break;
-                    }
                 }
             },
             true
         );
     }
 
-    void ServiceSeeker::initial_service_nodes(){
-        std::string service_prefix = "/services/" + serviceName_ + "/";
-        //直接采用同步调用，因此这里直接get，这里需要去阻塞，不然没办法正确提供服务
-        auto resp = etcd_->ls(service_prefix).get();
-        std::unique_lock<std::mutex> locker(mtx_);
+    bool ServiceSeeker::watch(const std::string & service_name){
+        //增加某个service到watch列表
+        std::lock_guard<std::mutex> map_locker(_watch_mtx);
+        if(_endpoint_map.find(service_name) != _endpoint_map.end()) return false;  //已经有了，直接返回吧
+        
+        auto snm = std::make_unique<ServiceNodeMeta>();
+        _endpoint_map[service_name] = std::move(snm);
+        auto & meta = _endpoint_map[service_name];  //这里是引用        
+
+        //直接采用同步调用，因此这里直接get，这里需要去阻塞，获得服务的初始列表
+        std::string service_prefix = "/services/" + service_name + "/";
+        auto resp = _etcd.ls(service_prefix).get();
+        
         for(auto & kv : resp.values()){
+            std::string key = kv.key();
+            int pos2 = key.rfind('/');
+            // std::string service_name = key.substr(pos1 + 1, pos2 - pos1 - 1);
+            std::string node_name = key.substr(pos2 + 1, key.size() - pos2 - 1);
+
             ServiceEndpoint new_node;
             parserNodeFromEtcd(kv, new_node);
+            {
+                std::unique_lock<std::mutex> locker(meta->pond_mtx);
+                meta->nodes_pond[node_name] = std::move(new_node);
+            }
 
-            nodes_.insert(kv.key(), new_node.load_score);
-            nodes_pond_[kv.key()] = std::move(new_node);
+            meta->node_list.insert(node_name, new_node.load_score);
+        }
+        return true;
+    }
+
+    //将service剔除出Watcher队列
+    void ServiceSeeker::unwatch(const std::string & service_name){
+        std::lock_guard<std::mutex> map_locker(_watch_mtx);
+        _endpoint_map.erase(service_name);
+    }
+
+    ServiceSeeker::~ServiceSeeker(){
+        _destorying.store(true);
+        // stopWatch();  //先停止再通知，否则容易导致线程退出时还在notify
+        _watch_cv.notify_all();
+        while(!_watcher->Cancelled()) _watcher->Cancel();
+        
+        if(_watcher_thread.joinable()) _watcher_thread.join();  //析构掉线程
+    }
+
+    void ServiceSeeker::thread_working() noexcept{
+        while(!_destorying){
+            {
+                std::unique_lock<std::mutex> locker(_watch_mtx);
+                _watch_cv.wait(locker, [this]()->bool{ return _watching || _destorying; });
+                if(_destorying) break;
+            }
+
+            _watcher->Wait();
+        }
+    }
+
+    inline std::optional<InetAddr> ServiceSeeker::getServiceNode(const std::string & service_name) {
+        std::lock_guard<std::mutex> locker(_watch_mtx);
+        // auto itr = _endpoint_map.end();
+        auto itr = _endpoint_map.find(service_name);
+        if(itr == _endpoint_map.end()) return std::nullopt;  //并没有找到对应的服务，直接返回
+
+        auto node_name = balancer_->select(itr->second->node_list);
+        if(!node_name.has_value()) return std::nullopt;
+        {
+            std::unique_lock<std::mutex> locker(itr->second->pond_mtx);
+            if(auto it = itr->second->nodes_pond.find(node_name.value()); it != itr->second->nodes_pond.end()){
+                return *it->second.addr;
+            } else {
+                return std::nullopt;
+            }
         }
     }
 }

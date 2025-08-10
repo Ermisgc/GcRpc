@@ -19,6 +19,7 @@ namespace GcRpc{
      * @param port 16bit port number, typed as uint16_t or char *
      */
     class InetAddr{
+        friend class TcpConnection;
         sockaddr_in m_addr;  //4 bytes;
         //TODO:add ipv6 support
     public:
@@ -30,9 +31,10 @@ namespace GcRpc{
         InetAddr(const char * _ip, uint16_t _port);
         InetAddr(const InetAddr & );
         
-        inline sockaddr* addr(){
-            m_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-            return reinterpret_cast<sockaddr*>(&m_addr);
+        inline sockaddr* addr() const {
+            // m_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+            // return reinterpret_cast<sockaddr*>(&m_addr);
+            return (sockaddr *)&m_addr;  //直接显式转换
         }
 
         inline socklen_t size() const {return sizeof(sockaddr_in);}
@@ -74,7 +76,7 @@ namespace GcRpc{
 
     using EndPointList = gcdst::HashHeap<std::string, float>;
 
-    //从etcd返回的节点value（经过protobuf编译）中, 
-    //TODO:还没写完呢
     void parserNodeFromEtcd(const etcd::Value & value, ServiceEndpoint & ep);
+
+    std::string getLocalIP();
 }

@@ -1,16 +1,19 @@
-#pragma once
+#ifndef RPC_PROVIDER_H
+#define RPC_PROVIDER_H
 #include "google/protobuf/service.h"
-#include "./data_structure/concurrentqueue.h"
 #include "hipe/dynamic_threadpool.h"
 #include <functional>
 #include "arpa/inet.h"
+#include "net_base.h"
 #include <unordered_map>
 #include <vector>
 #include <atomic>
 #include "liburing.h"
+#include <etcd/Client.hpp>
+#include <etcd/KeepAlive.hpp>
+#include "connection_pool.h"
 
 namespace GcRpc{
-    class EventLoop;
     class Channel;
     class LogMsg;
     class IProtocalDetector;
@@ -20,25 +23,53 @@ namespace GcRpc{
 
     class RpcProvider
     {
-    private:
+        friend class TcpConnection;  //设定TcpConnection为友元，让它可以访问私有方法
         struct MethodTable{
             Service * service;
             std::unordered_map<std::string, const ::google::protobuf::MethodDescriptor *> methodTable;
         };
 
-        //std::vector<EventLoop *> loops;
-        LockFreeChannelQueue * feedback_queue;
-        sockaddr_in * addr;
+        //工作线程的线程池对象
         gchipe::DynamicThreadPool * threadPond;
+
+        //本地的ip地址
+        sockaddr_in * addr;
+        
+        //本地的sockfd
         int _fd;
-        std::atomic<int> _status;
+
+        //io_uring相关结构体
         struct io_uring ring;
         struct io_uring_params params;
+
+        //连接管理器
+        std::unique_ptr<ConnectionManager> _connection_manager;
+
+        //服务表
         std::unordered_map<std::string, MethodTable> serviceTable;
 
-        void onConnection();
-        void onMessage(Channel *);
-        void parseProtoMessage(const std::string & proto_message, Channel *);
+        //当前连接的状态信息
+        int _active_conn = 0;
+        int _max_conn = 0;
+        static std::atomic<int> _status;
+
+        //etcd相关
+        etcd::Client _etcd;
+        std::shared_ptr<etcd::KeepAlive> _lease_keeper;
+        int64_t _lease_id;
+
+        void onMessage(RequestInformation && ri);
+
+        void unRegisterEtcdServices();
+
+        //检测etcd的租约是不是正常健康的，如果不健康，要及时续约
+        void healthCheck();
+
+        static void sigint_handler(int sig);  //Ctrl + C退出事件
+
+        struct io_uring_sqe * getOneSqe();
+
+        void asyncHandleRequest(RequestInformation && ri);
 
     public:
         RpcProvider();
@@ -46,6 +77,8 @@ namespace GcRpc{
 
         void Notify(::google::protobuf::Service *);
 
-        void loop();
+        void loop();        
     };
 };
+
+#endif

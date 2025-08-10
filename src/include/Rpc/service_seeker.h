@@ -7,45 +7,46 @@
 #include <memory>
 
 namespace GcRpc{
+
+    //TODO:ServiceSeeker的设计不适合RAII，etcd_client资源应该在内部完成
     class ServiceSeeker{
-        std::string serviceName_;
+        struct ServiceNodeMeta{
+            std::unordered_map<std::string, ServiceEndpoint> nodes_pond;
+            std::mutex pond_mtx;
+            EndPointList node_list;
+        };
+
+        std::unordered_map<std::string, std::unique_ptr<ServiceNodeMeta>> _endpoint_map;
+
         std::shared_ptr<LoadBalancer> balancer_;
 
-        std::unordered_map<std::string, ServiceEndpoint> nodes_pond_;
-        EndPointList nodes_;
-        std::mutex mtx_;  //for protecting unordered_map
 
         //通过etcd的watch机制从etcd服务器拉取对应键值的列表
-        std::shared_ptr<etcd::Client> etcd_;
+        etcd::Client _etcd;
+        std::unique_ptr<etcd::Watcher> _watcher;  //这里选择1 watcher 多 key的配置方式
+
         //这里得用指针，因为Watcher类禁止拷贝，后面就没办法reset了，
         //后续可以改为unique_ptr(但是因为和线程有析构顺序，因此选择手动控制)
-        etcd::Watcher * watcher_;  
-        std::atomic<bool> watching_;
-        std::condition_variable watch_cv;
-        std::thread watcher_thread_;
-        std::mutex watch_mtx_;
+        std::atomic<bool> _watching;
+        std::condition_variable _watch_cv;
+        std::thread _watcher_thread;
+        std::mutex _watch_mtx;
 
-        std::atomic<bool> destorying_; //destroying指示符用于析构本类时停止线程
+        std::atomic<bool> _destorying; //destroying指示符用于析构本类时停止线程
     public:
-        ServiceSeeker(std::shared_ptr<etcd::Client> etcd_client, const std::string & serviceName, std::shared_ptr<LoadBalancer> balancer);
+        ServiceSeeker(std::shared_ptr<LoadBalancer> balancer);
         ~ServiceSeeker() noexcept;
         
         ServiceSeeker(const ServiceSeeker &) = delete;
-        ServiceSeeker(const ServiceSeeker &&) = delete;
+        ServiceSeeker(ServiceSeeker &&) = delete;
         
-        void startWatch();
+        bool watch(const std::string & service_name);
 
-        void stopWatch();
+        void unwatch(const std::string & service_name);
 
-        std::optional<InetAddr> getService();
-        
-        //这里选择用reset，可以让系统对服务进行复用
-        void reset(std::shared_ptr<etcd::Client> etcd_client, const std::string & serviceName, std::shared_ptr<LoadBalancer> balancer);
+        std::optional<InetAddr> getServiceNode(const std::string & service_name);
+
     private:
         void thread_working() noexcept;
-
-        etcd::Watcher * createWatcher();
-
-        void initial_service_nodes();
     };
 }

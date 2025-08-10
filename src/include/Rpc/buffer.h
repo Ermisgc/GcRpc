@@ -16,12 +16,12 @@ namespace GcRpc{
      * @attention I design a null position to handle the corner condition of ring buffer, so the actual buffer size is one 
      * less than the MAX_BUFFER_SIZE. If setting MAX_BUFFER_SIZE=1024, only 1023 Bytes can be written in.
      */
-    class Buffer{
+    class Buffer{   //TODO:使用atomic来避免多线程竞争
         std::vector<char> buf;
         uint16_t readIndex;
         uint16_t writeIndex;  
     public:
-        Buffer();
+        Buffer(size_t max_size = MAX_BUFFER_SIZE);
         ~Buffer() = default;
         Buffer(const Buffer & other); //deepcopy
         Buffer(Buffer && other);

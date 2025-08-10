@@ -1,6 +1,7 @@
 #include "Rpc/rpc_protocal.h"
 #include <arpa/inet.h>
 #include <endian.h>
+#include <optional>
 
 namespace GcRpc{
     bool parserProtocalFromString(const std::string & recv_str, RequestInformation & protocal_info){
@@ -44,6 +45,61 @@ namespace GcRpc{
             std::cout << e.what() << std::endl;
             return false;
         }
+    }
+
+    std::optional<uint16_t> parserProtocalHeader(const std::string & recv_str, RequestInformation & protocal_info){
+        assert(recv_str.size() == PROTOCAL_HEADER_LEN);
+        try{
+            //parser the recv_str to protocal_info
+            uint32_t magic_num;
+            memcpy(&magic_num, recv_str.substr(0, 4).c_str(), 4);
+
+            magic_num = ntohl(magic_num);
+            if(magic_num ^ MagicNumber){
+                std::cout << "magic number is not correct !!!" << std::endl;
+                return false;
+            }
+
+            protocal_info.version = (uint8_t)(recv_str[4]);
+            protocal_info.message_type = (uint8_t)(recv_str[5]);
+            protocal_info.status = (uint8_t)(recv_str[6]);
+            protocal_info.flag = (uint8_t)(recv_str[7]);
+            memcpy(&protocal_info.request_id, recv_str.substr(8, 8).c_str(), 8);
+            protocal_info.request_id = ntohll(protocal_info.request_id);
+            uint32_t proto_header_len;
+            memcpy(&proto_header_len, recv_str.substr(16, 4).c_str(), 4);
+            proto_header_len = ntohl(proto_header_len);
+            
+            assert(proto_header_len <= UINT16_MAX);
+            return proto_header_len;
+        } catch(const std::out_of_range & e){
+            std::cout << e.what() << std::endl;
+            return std::nullopt;
+        }        
+    }
+
+    std::optional<uint16_t> parserProtocalRpcHeader(const std::string & protobuf_str, RequestInformation & protocal_info){
+        try{
+            RpcHeader header;
+            header.ParseFromString(protobuf_str);
+            protocal_info.service_name = header.service_name();
+            protocal_info.method_name = header.method_name();
+            return header.args_size();    //TODO:proto文件的大小最好能改到uint16_t，同步
+        } catch(const std::exception & e){
+            std::cout << e.what() << std::endl;
+            return std::nullopt;
+        }       
+    }
+
+
+    bool parserProtocalBody(const std::string & protobuf_str, RequestInformation & protocal_info){
+        try{
+            protocal_info.body_data = std::move(protobuf_str);
+        } catch(const std::exception & e){
+            std::cout << e.what() << std::endl;
+            return false;
+        }
+        return true;
     }
 
     bool generateStringFromProtocal(const RequestInformation & protocal_info, std::string & send_str){

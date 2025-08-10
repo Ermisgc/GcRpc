@@ -8,14 +8,27 @@
 #include "buffer.h"
 #include "arpa/inet.h"
 #include <functional>
+#include <memory>
+
 #define USER_EVENT_ACCEPT 0
 #define USER_EVENT_READ 1
 #define USER_EVENT_WRITE 2
 #define USER_EVENT_HANDLE 3
 #define USER_EVENT_CLOSE 4
+#define USER_EVENT_WRITE_THEN_CLOSE 5
 
 namespace GcRpc{
     class Buffer;
+
+    struct ChannelV2{
+        std::unique_ptr<Buffer> buffer; //异步读的缓冲 //TODO:Buffer重新设计，可能需要读写双传冲区
+        sockaddr_in sock_addr;
+        socklen_t len {sizeof(sockaddr_in)};
+    };
+    // static socklen_t * ChannelV2::len = new socklen_t(sizeof(sockaddr_in));
+
+
+
     class Channel{
         using EventHandler = std::function<void(void*)>;
     public:
