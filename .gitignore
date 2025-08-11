@@ -1,15 +1,23 @@
-.vscode/*
+*
 
-bin/*
+!.gitignore
 
-build/*
+!example/*
 
-lib/*
+!include/*
 
-test/*
+!md_resource/*
 
-todo_list.md
+!protos/*
 
-draw/*
+!src/*
 
-history_bin/*
+!autobuild.sh
+
+!client.config
+
+!CMakeLists.txt
+
+!gcrpc.config
+
+!README.md
