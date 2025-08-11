@@ -79,4 +79,12 @@ namespace GcRpc{
     void parserNodeFromEtcd(const etcd::Value & value, ServiceEndpoint & ep);
 
     std::string getLocalIP();
+
+    unsigned char base64_reverse(char input);
+
+    std::string base64Encoding(const std::vector<uint8_t> & input);
+
+    std::string base64Encoding(const std::string & input);
+
+    std::vector<uint8_t> base64Decoding(const std::string & input);
 }

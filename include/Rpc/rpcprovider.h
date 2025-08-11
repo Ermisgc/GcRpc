@@ -25,6 +25,7 @@ namespace GcRpc{
     class RpcProvider
     {
         friend class TcpConnection;  //设定TcpConnection为友元，让它可以访问私有方法
+        friend class EtcdClient;     //TODO:有没有什么优雅的方法让基类和它的派生类都可以访问类的私有成员对象
         struct MethodTable{
             Service * service;
             std::unordered_map<std::string, const ::google::protobuf::MethodDescriptor *> methodTable;
@@ -64,6 +65,11 @@ namespace GcRpc{
         struct io_uring_sqe * getOneSqe();
 
         void asyncHandleRequest(RequestInformation && ri);
+
+        template<typename _Callable>
+        void asyncHandle(_Callable && fun){
+            threadPond->execute(std::forward<_Callable>(fun));
+        }
 
     public:
         RpcProvider();

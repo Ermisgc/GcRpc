@@ -12,9 +12,6 @@
 namespace GcRpc{
     class ChannelV2;
     class TcpConnection;
-    class RpcProvider;
-
-    using EventLoop = RpcProvider;
 
     unsigned long long getIOUringUserdata(UringChannel * uc, uint8_t event_type);
 
