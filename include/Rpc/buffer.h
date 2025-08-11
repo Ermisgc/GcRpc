@@ -5,7 +5,7 @@
 #include <vector>
 #include <atomic>
 namespace GcRpc{
-    constexpr uint16_t MAX_BUFFER_SIZE = 256;
+    constexpr uint16_t MAX_BUFFER_SIZE = 1024;
 
     /**
      * @brief Buffer is designed using a ring buffer area same as Netty-Buffer. Copy and move constructor are all provided.

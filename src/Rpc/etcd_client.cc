@@ -6,7 +6,7 @@
 
 namespace GcRpc{
     EtcdClient::EtcdClient(const std::string etcd_url, EventLoop * loop):_etcd_client_url(etcd_url), _loop(loop){
-        assert(loop); 
+        // assert(loop); 
         _curl = curl_easy_init();
         if(!_curl){
             throw("curl can not be initiated");
@@ -67,8 +67,9 @@ namespace GcRpc{
             {"value", base64Encoding(value)}
         };
         if(with_lease){
-            request["lease"] = std::to_string(_lease_id);
+            request["lease"] = _lease_id;
         }
+        
         curlRequest("/v3/kv/put", request);
     }
 
@@ -79,7 +80,7 @@ namespace GcRpc{
         if(prefix){
             request["range_end"] = base64Encoding(key + "\xff");
         }
-        curlRequest("/v3/kv/get", request);
+        curlRequest("/v3/kv/range", request);
     }
 
     void EtcdClient::async_leastTimeToLive(int64_t lease_id){
@@ -91,7 +92,7 @@ namespace GcRpc{
 
     void EtcdClient::async_leaseRevoke(int64_t lease_id){
         json request = {
-            {"ID", std::to_string(lease_id)}
+            {"ID", lease_id}
         };
         curlRequest("/v3/lease/revoke", request);
     }
@@ -100,6 +101,8 @@ namespace GcRpc{
     void EtcdClient::curlRequest(const std::string & path, const json & request){
         std::string url = _etcd_client_url + path;
         std::string request_json = request.dump();
+
+        // std::cout << request_json << std::endl;
 
         curl_easy_setopt(_curl, CURLOPT_URL, url.c_str());   //url
         curl_easy_setopt(_curl, CURLOPT_POSTFIELDS, request_json.c_str());   //-d 
@@ -121,6 +124,7 @@ namespace GcRpc{
 
     void EtcdClient::parserResponse(const std::string && response){
         try{
+            // printResponse(response);
             json j = json::parse(response);
             if(j.contains("error") && !j["error"].get<std::string>().empty()){
                 //有错误：
@@ -128,8 +132,9 @@ namespace GcRpc{
                 return;
             }
 
-            if(j.contains("result")){
-                _lease_id = j["result"]["ID"].get<int64_t>();
+            if(j.contains("ID")){
+                _lease_id = j["ID"].get<std::string>();
+                // std::cout << _lease_id << endl;
             }
 
         } catch (const std::exception & e){
@@ -141,5 +146,9 @@ namespace GcRpc{
         size_t newLength = size * nmemb;
         s->append((char*)contents, newLength);
         return newLength;
+    }
+
+    void EtcdClient::printResponse(const std::string & response){
+        std::cout << response << std::endl;
     }
 }

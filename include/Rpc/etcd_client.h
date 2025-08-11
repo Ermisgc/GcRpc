@@ -19,10 +19,10 @@ namespace GcRpc{
 
     class EtcdClient : public UringChannel{
         CURL * _curl;
-        curl_slist * _headers;
+        curl_slist * _headers = nullptr;
         std::string _etcd_client_url;
         EventLoop * _loop;
-        uint64_t _lease_id = 0;
+        std::string _lease_id;
         Buffer _response_data;
 
     public:
@@ -42,7 +42,7 @@ namespace GcRpc{
 
         virtual void do_io_uring(int last_res, int last_event_type) override;
 
-    private:
+    public:
 
         //以下函数均需异步调用
         void async_leaseGrant(int ttl);
@@ -62,6 +62,8 @@ namespace GcRpc{
 
         //curl回调函数，接收返回来的数据，这里的s是我传入的指针
         static size_t WriteCallback(void *contents, size_t size, size_t nmemb, Buffer *s);
+
+        void printResponse(const std::string & response);
     };
 }
 
