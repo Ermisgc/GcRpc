@@ -12,6 +12,7 @@
 #include <etcd/Client.hpp>
 #include <etcd/KeepAlive.hpp>
 #include "connection_pool.h"
+#include "service_register.h"
 
 namespace GcRpc{
     class Channel;
@@ -54,16 +55,9 @@ namespace GcRpc{
         static std::atomic<int> _status;
 
         //etcd相关
-        etcd::Client _etcd;
-        std::shared_ptr<etcd::KeepAlive> _lease_keeper;
-        int64_t _lease_id;
+        ServiceRegister _service_register; 
 
         void onMessage(RequestInformation && ri);
-
-        void unRegisterEtcdServices();
-
-        //检测etcd的租约是不是正常健康的，如果不健康，要及时续约
-        void healthCheck();
 
         static void sigint_handler(int sig);  //Ctrl + C退出事件
 
@@ -73,6 +67,7 @@ namespace GcRpc{
 
     public:
         RpcProvider();
+        
         ~RpcProvider();
 
         void Notify(::google::protobuf::Service *);

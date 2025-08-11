@@ -16,19 +16,11 @@ void GcRpcApplication::ShowArgsHelp(){
     std::cout << "format: command -i <configfile>" << std::endl;
 }
 
-GcRpcApplication *GcRpcApplication::instance = nullptr;
-std::mutex GcRpcApplication::locker;
 GcRpcConfig GcRpcApplication::m_config;
     //lazy Singleton
 GcRpcApplication & GcRpcApplication::getInstance(){
-    if(!instance){
-        locker.lock();
-        if(!instance){
-            instance = new GcRpcApplication();
-        }
-        locker.unlock();
-    }
-    return *instance;
+    static GcRpcApplication instance;
+    return instance;
 }
 
 void GcRpcApplication::Init(int argc, char** argv){

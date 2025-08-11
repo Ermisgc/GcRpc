@@ -24,6 +24,9 @@ GcRpc是Linux系统下的一个简易rpc框架，基于etcd实现服务发现、
 
 `GcRpc`选择创建一个`ConnectionManager`类来管理`TcpConnection`，它来管理何时要向内核申请对象，来管理对象的析构，来回应EventLoop对新的Tcp连接的需求。
 
+### 3. 自定义的etcd API
+`etcd-cpp-apiv3`是`etcd`官方的API库，但是在实际使用时，我发现它有一些问题，特别是当使用该库做服务发现。它直接基于`grpc`来与`etcd server`进行通信，因为`grpc`调用时本身就会创建若干工作线程来实现`io`，这意味着如果仍旧使用该库，将浪费大量的线程在`grpc`的io操作上，得不偿失。因此`GcRpc`选择自己去写`etcd API`，并能够基于`io_uring`实现与`TcpConnection`相同的异步操作，从而实现自主可控的`etcd`调用。
+
 # 客户端
 客户端服务调用使用`RpcCaller`类，该类维护多个线程，每个线程具有自己的任务队列。
 
@@ -40,7 +43,7 @@ GcRpc是Linux系统下的一个简易rpc框架，基于etcd实现服务发现、
 
 
 # 安装
-项目还不是很完善，因此并不能直接使用，TODO
+项目还不是很完善，TODO
 
 # 特性
 - 服务发现，基于etcd实现

@@ -16,8 +16,12 @@ namespace GcRpc{
 
     using EventLoop = RpcProvider;
 
-    //TODO:自定义事件回调机制设计完善
+    unsigned long long getIOUringUserdata(UringChannel * uc, uint8_t event_type);
 
+    //根据io_uring的user data中的数据进行io_uring的自动调用
+    void executeIOUringCallback(unsigned long long user_data, int res);
+
+    //TODO:自定义事件回调机制设计完善
     #define CONNECTION_STATUS_READABLE 1  //可执行写指令
     #define CONNECTION_STATUS_WRITABLE 2  //可执行读指令
     #define CONNECTION_STATUS_CLOSING 4  //可执行关闭指令
@@ -26,7 +30,7 @@ namespace GcRpc{
     //一个是事件循环线程，一个是worker线程，两者发生竞争的概率其实很小
     //因此采用乐观锁CAS操作来解决两者的并发冲突
     //TODO:怎么区分客户端和服务端的编译行为呢
-    class TcpConnection{
+    class TcpConnection :public UringChannel{
         friend class CallbackAccept;
         friend class CallbackRead;
 
@@ -68,7 +72,7 @@ namespace GcRpc{
 
         ~TcpConnection() noexcept;
 
-        void do_io_uring(int last_res, int last_event_type);
+        void do_io_uring(int last_res, int last_event_type) override;
         
         //用于Client端调用，Client端调用connect
         bool connect(const InetAddr && addr);
@@ -112,11 +116,6 @@ namespace GcRpc{
         //使用Buffer时，记录读取的字节数
         void recordReadBytes(size_t read_bytes);
     };
-
-    unsigned long long getIOUringUserdata(TcpConnection * tc, uint8_t event_type);
-
-    //根据io_uring的user data中的数据进行io_uring的自动调用
-    void executeIOUringCallback(unsigned long long user_data, int res);
 
     //连接池 //TODO:连接池LRU策略实现  //TODO:连接过期实现
     //GcRpc里，线程池是单线程
