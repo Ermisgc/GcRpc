@@ -18,7 +18,7 @@ using namespace GcRpc;
 
 std::atomic<int> RpcProvider::_status = PROVIDER_UNSTART;
 
-RpcProvider::RpcProvider(): ring(), params(), _service_register(GcRpcApplication::Load("etcd_addr")){
+RpcProvider::RpcProvider(): ring(), params(), _service_register(this, stoi(GcRpcApplication::Load("ttl"))){
     std::cout << ">>> " << "IO_uring is initializing ..." << std::endl;
 
     //创建io_uring
@@ -51,6 +51,11 @@ RpcProvider::RpcProvider(): ring(), params(), _service_register(GcRpcApplication
     threadPond = gchipe::DynamicThreadPool::getInstance(stoi(GcRpcApplication::Load("worker_thread")));
     
     _max_conn = stoi(GcRpcApplication::Load("max_conn"));
+
+    //初始化节点信息
+    _node_info_rpc.set_addr(inet_addr(getLocalIP().c_str()));
+    _node_info_rpc.set_port(stoi(GcRpcApplication::Load("port")));
+    _node_info_rpc.set_max_conn(_max_conn);
     
     //TODO:连接管理器的初始连接数量需要由文件设定
     _connection_manager = std::make_unique<ConnectionManager>(_fd, this, params.sq_entries, _max_conn);
@@ -79,22 +84,10 @@ void RpcProvider::Notify(::google::protobuf::Service * new_service){
 
 void RpcProvider::loop(){
     //申请一个keepalive租约并且一直执行keepalive：
-    //TODO:改用RAII来管理租约行为，类创建时获取租约，类析构时释放租约，并且提供租约自动续租类
-    _service_register.startRegister();
-
     for(const auto & pr: serviceTable){
-        const std::string etcd_node_key = "/services/" + pr.first + "/" + getLocalIP();
-        RpcNodeInfo info;
-
-        //addr->uint32_t
-        info.set_addr(inet_addr(getLocalIP().c_str()));
-        info.set_active_conn(this->_active_conn);
-        info.set_port(1214);   //本服务的端口号
-        info.set_max_conn(this->_max_conn);
-
-        const std::string etcd_node_value = info.SerializeAsString();
-        _service_register.registerService(etcd_node_key, etcd_node_value);
+        _service_register.registerService(pr.first);
     }
+    _service_register.startRegister();
 
     _status.store(PROVIDER_LOOPING);
 
@@ -103,6 +96,7 @@ void RpcProvider::loop(){
 
     //创建若干个io_uring接收缓冲区
     io_uring_cqe * cqes[params.cq_entries];
+
 
     //开始事件循环
     while(_status == PROVIDER_LOOPING){
@@ -119,11 +113,9 @@ void RpcProvider::loop(){
             executeIOUringCallback(cqe_now->user_data, cqe_now->res);            
             io_uring_cqe_seen(&ring, cqe_now);
         }
-
-        //检查租约是否还在
     }
 
-    _service_register.startRegister();
+    _service_register.stopRegister();
 }
 
 void RpcProvider::onMessage(RequestInformation && ri){
@@ -177,5 +169,11 @@ void RpcProvider::asyncHandleRequest(RequestInformation && ri){
         }
     );
 }
+
+std::string RpcProvider::getNodeInfo(){
+    _node_info_rpc.set_active_conn(_active_conn);
+    return _node_info_rpc.SerializeAsString();
+}
+
 
 #undef p

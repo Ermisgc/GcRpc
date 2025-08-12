@@ -86,5 +86,5 @@ namespace GcRpc{
 
     std::string base64Encoding(const std::string & input);
 
-    std::vector<uint8_t> base64Decoding(const std::string & input);
+    std::string base64Decoding(const std::string & input);
 }

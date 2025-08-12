@@ -13,11 +13,6 @@ namespace GcRpc{
     class ChannelV2;
     class TcpConnection;
 
-    unsigned long long getIOUringUserdata(UringChannel * uc, uint8_t event_type);
-
-    //根据io_uring的user data中的数据进行io_uring的自动调用
-    void executeIOUringCallback(unsigned long long user_data, int res);
-
     //TODO:自定义事件回调机制设计完善
     #define CONNECTION_STATUS_READABLE 1  //可执行写指令
     #define CONNECTION_STATUS_WRITABLE 2  //可执行读指令

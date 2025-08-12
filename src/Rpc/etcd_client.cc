@@ -6,7 +6,6 @@
 
 namespace GcRpc{
     EtcdClient::EtcdClient(const std::string etcd_url, EventLoop * loop):_etcd_client_url(etcd_url), _loop(loop){
-        // assert(loop); 
         _curl = curl_easy_init();
         if(!_curl){
             throw("curl can not be initiated");
@@ -28,69 +27,111 @@ namespace GcRpc{
         curl_easy_cleanup(_curl);
     }
 
-    void EtcdClient::do_io_uring(int last_res, int last_event_type) {
-
-    }
-
     //以下函数均需异步调用
-    void EtcdClient::leaseGrant(int ttl){
-        _loop->asyncHandle(std::bind(&EtcdClient::async_leaseGrant, this, ttl));
+    std::future<std::string> EtcdClient::async_leaseGrant(int ttl){
+        if(!_loop) return std::future<std::string>();
+        std::promise<std::string> p;
+        _loop->asyncHandle(std::bind(&EtcdClient::leaseGrant, this, ttl));
+        return p.get_future();
     }
 
-    void EtcdClient::put(const std::string & key, const std::string & value, bool with_lease){
-        _loop->asyncHandle(std::bind(&EtcdClient::async_put, this, key, value, with_lease));
+    void EtcdClient::async_put(const std::string & key, const std::string & value, std::string lease_id){
+        if(!_loop) return;
+        _loop->asyncHandle(std::bind(&EtcdClient::put, this, key, value, lease_id));
     }
 
-    void EtcdClient::get(const std::string & key, bool prefix){
-        _loop->asyncHandle(std::bind(&EtcdClient::async_get, this, key, prefix));
+    std::future<std::vector<std::pair<std::string, std::string>>> EtcdClient::async_get(const std::string & key, bool prefix){
+        if(!_loop) return std::future<std::vector<std::pair<std::string, std::string>>>();
+        std::promise<std::vector<std::pair<std::string, std::string>>> p;
+        _loop->asyncHandle(std::bind(&EtcdClient::get, this, key, prefix));
+        return p.get_future();
     }
 
-    void EtcdClient::leastTimeToLive(int64_t lease_id){
-        _loop->asyncHandle(std::bind(&EtcdClient::async_leastTimeToLive, this, lease_id));
+    std::future<int> EtcdClient::async_leastTimeToLive(const std::string & lease_id){
+        if(!_loop) return std::future<int>();
+        std::promise<int> p;
+        _loop->asyncHandle(std::bind(&EtcdClient::leastTimeToLive, this, lease_id));
+        return p.get_future();
     }
 
-    void EtcdClient::leaseRevoke(int64_t lease_id){
-        _loop->asyncHandle(std::bind(&EtcdClient::async_leaseRevoke, this, lease_id));
+    void EtcdClient::async_leaseRevoke(const std::string & lease_id){
+        if(!_loop) return;
+        _loop->asyncHandle(std::bind(&EtcdClient::leaseRevoke, this, lease_id));
     }
 
-    //以下函数均需异步调用
-    void EtcdClient::async_leaseGrant(int ttl){
+    std::string EtcdClient::leaseGrant(int ttl){
         json request = {
             {"TTL", ttl}
         };
-        curlRequest("/v3/lease/grant", request);
+        std::string response = curlRequest("/v3/lease/grant", request);
+        try{
+            // printResponse(response);
+            json j = json::parse(response);
+            if(j.contains("error") && !j["error"].get<std::string>().empty()){
+                //有错误：
+                std::cerr << "Etcd error: " << j["error"].get<std::string>() << std::endl; 
+                return "";
+            }
+
+            if(j.contains("ID")){
+                return j["ID"].get<std::string>();
+            }
+            return "";
+        } catch (const std::exception & e){
+            std::cerr << "Etcd parserResponse error: " << e.what() << std::endl;
+            return "";
+        }
     }
 
-    void EtcdClient::async_put(const std::string & key, const std::string & value, bool with_lease){
+    void EtcdClient::put(const std::string & key, const std::string & value, std::string lease_id){
         json request = {
             {"key", base64Encoding(key)},
             {"value", base64Encoding(value)}
         };
-        if(with_lease){
-            request["lease"] = _lease_id;
+        if(lease_id != "0"){
+            request["lease"] = lease_id;
         }
         
         curlRequest("/v3/kv/put", request);
     }
 
-    void EtcdClient::async_get(const std::string & key, bool prefix){
+    std::vector<std::pair<std::string, std::string>> EtcdClient::get(const std::string & key, bool prefix){
         json request = {
             {"key", base64Encoding(key)}
         };
         if(prefix){
             request["range_end"] = base64Encoding(key + "\xff");
         }
-        curlRequest("/v3/kv/range", request);
+        std::string response = curlRequest("/v3/kv/range", request);
+        std::vector<std::pair<std::string, std::string>> ret;
+        parserResponseForGet(response, ret);
+        return ret;
     }
 
-    void EtcdClient::async_leastTimeToLive(int64_t lease_id){
+    int EtcdClient::leastTimeToLive(std::string lease_id){
         json request = {
-            {"ID", std::to_string(lease_id)}
+            {"ID", lease_id}
         };
-        curlRequest("/v3/lease/keepalive", request);
+        std::string response = curlRequest("/v3/lease/keepalive", request);
+        try{
+            json j = json::parse(response);
+            if(j.contains("error") && !j["error"].get<std::string>().empty()){
+                //有错误：
+                std::cerr << "Etcd error: " << j["error"].get<std::string>() << std::endl; 
+                return -1;
+            }
+
+            if(j.contains("TTL")){
+                return j["TTL"].get<int>();
+            }
+            return -1;
+        } catch (const std::exception & e){
+            std::cerr << "Etcd parserResponseForGet error: " << e.what() << std::endl;
+            return -1;
+        }
     }
 
-    void EtcdClient::async_leaseRevoke(int64_t lease_id){
+    void EtcdClient::leaseRevoke(std::string lease_id){
         json request = {
             {"ID", lease_id}
         };
@@ -98,7 +139,7 @@ namespace GcRpc{
     }
 
     //同步操作
-    void EtcdClient::curlRequest(const std::string & path, const json & request){
+    std::string EtcdClient::curlRequest(const std::string & path, const json & request){
         std::string url = _etcd_client_url + path;
         std::string request_json = request.dump();
 
@@ -115,31 +156,12 @@ namespace GcRpc{
         } else {
             curl_easy_getinfo(_curl, CURLINFO_RESPONSE_CODE, &http_code);
             if(http_code == 200){  //成功响应
-                parserResponse(_response_data.retrieveAllBufferAsString());
+                return _response_data.retrieveAllBufferAsString();
             } else {
                 std::cerr << "HTTP Response Error: " << http_code << std::endl;
             }
         }
-    }
-
-    void EtcdClient::parserResponse(const std::string && response){
-        try{
-            // printResponse(response);
-            json j = json::parse(response);
-            if(j.contains("error") && !j["error"].get<std::string>().empty()){
-                //有错误：
-                std::cerr << "Etcd error: " << j["error"].get<std::string>() << std::endl; 
-                return;
-            }
-
-            if(j.contains("ID")){
-                _lease_id = j["ID"].get<std::string>();
-                // std::cout << _lease_id << endl;
-            }
-
-        } catch (const std::exception & e){
-            std::cerr << "Etcd parserResponse error: " << e.what() << std::endl;
-        }
+        return "";
     }
 
     size_t EtcdClient::WriteCallback(void *contents, size_t size, size_t nmemb, Buffer *s){
@@ -150,5 +172,24 @@ namespace GcRpc{
 
     void EtcdClient::printResponse(const std::string & response){
         std::cout << response << std::endl;
+    }
+
+    void EtcdClient::parserResponseForGet(const std::string & response, std::vector<std::pair<std::string, std::string>> & ret){
+        try{
+            json j = json::parse(response);
+            if(j.contains("error") && !j["error"].get<std::string>().empty()){
+                //有错误：
+                std::cerr << "Etcd error: " << j["error"].get<std::string>() << std::endl; 
+                return;
+            }
+
+            if(j.contains("kvs")){
+                for(auto & i : j["kvs"]){
+                    ret.emplace_back(base64Decoding(i["key"].get<std::string>()), base64Decoding(i["value"].get<std::string>()));
+                }
+            }
+        } catch (const std::exception & e){
+            std::cerr << "Etcd parserResponseForGet error: " << e.what() << std::endl;
+        }
     }
 }

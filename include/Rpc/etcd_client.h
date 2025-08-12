@@ -10,55 +10,54 @@
 #include "Rpc/channel.h"
 
 
-//TODO:基于io_uring异步调用的etcd连接客户端
+//基于io_uring调用的etcd连接客户端
 //需要用到json库处理json数据
 //用curl库来实现调用
+
 namespace GcRpc{
     using json = nlohmann::json;
-    class EtcdResponse;
 
-    class EtcdClient : public UringChannel{
+    class EtcdClient {
+        friend class ServiceRegister;
+        friend class LeaseManager;
+
         CURL * _curl;
         curl_slist * _headers = nullptr;
         std::string _etcd_client_url;
         EventLoop * _loop;
-        std::string _lease_id;
+        // std::string _lease_id;
         Buffer _response_data;
 
     public:
-        EtcdClient(const std::string etcd_url, EventLoop * loop);
+        EtcdClient(const std::string etcd_url, EventLoop * loop = nullptr);
         ~EtcdClient() noexcept;
 
         //以下函数均需异步调用
-        void leaseGrant(int ttl);
+        std::future<std::string> async_leaseGrant(int ttl);
 
-        void put(const std::string & key, const std::string & value, bool with_lease = false);
+        void async_put(const std::string & key, const std::string & value, std::string lease_id = "0");
 
-        void get(const std::string & key, bool prefix = false);
+        std::future<std::vector<std::pair<std::string, std::string>>> async_get(const std::string & key, bool prefix = false);
 
-        void leastTimeToLive(int64_t lease_id);
+        std::future<int> async_leastTimeToLive(const std::string & lease_id);
 
-        void leaseRevoke(int64_t lease_id);
+        void async_leaseRevoke(const std::string & lease_id);
 
-        virtual void do_io_uring(int last_res, int last_event_type) override;
+        //以下函数为同步调用
+        std::string leaseGrant(int ttl);
 
-    public:
+        void put(const std::string & key, const std::string & value, std::string lease_id = "0");
 
-        //以下函数均需异步调用
-        void async_leaseGrant(int ttl);
+        std::vector<std::pair<std::string, std::string>> get(const std::string & key, bool prefix = false);
 
-        void async_put(const std::string & key, const std::string & value, bool with_lease = false);
+        int leastTimeToLive(std::string lease_id);
 
-        void async_get(const std::string & key, bool prefix = false);
-
-        void async_leastTimeToLive(int64_t lease_id);
-
-        void async_leaseRevoke(int64_t lease_id);
-
+        void leaseRevoke(std::string lease_id);
+    private:
         //curl请求
-        void curlRequest(const std::string & path, const json & request); 
+        std::string curlRequest(const std::string & path, const json & request); 
 
-        void parserResponse(const std::string && response);
+        void parserResponseForGet(const std::string & response, std::vector<std::pair<std::string, std::string>> & );
 
         //curl回调函数，接收返回来的数据，这里的s是我传入的指针
         static size_t WriteCallback(void *contents, size_t size, size_t nmemb, Buffer *s);

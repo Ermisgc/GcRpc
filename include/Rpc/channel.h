@@ -37,4 +37,9 @@ namespace GcRpc{
 
         virtual void do_io_uring(int last_res, int last_event_type) = 0;
     };
+
+    unsigned long long getIOUringUserdata(UringChannel * uc, uint8_t event_type);
+
+    //根据io_uring的user data中的数据进行io_uring的自动调用
+    void executeIOUringCallback(unsigned long long user_data, int res);
 }

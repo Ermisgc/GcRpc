@@ -128,8 +128,8 @@ namespace GcRpc{
         return base64Encoding(std::vector<uint8_t>(input.begin(), input.end()));
     }
 
-    std::vector<uint8_t> base64Decoding(const std::string & input){
-        std::vector<uint8_t> decoded;
+    std::string base64Decoding(const std::string & input){
+        std::string decoded;
         int n = input.length();
         decoded.reserve( (3 * n + 3) / 4);  //首先预留一部分空间
 

@@ -1,14 +1,15 @@
 #include "Rpc/channel.h"
+#include <assert.h>
 
 namespace GcRpc{
-    // Channel::Channel(int fd):_fd(fd), event_status(USER_EVENT_ACCEPT), len(sizeof(sockaddr_in)){
-    //     _buf = new Buffer();
-    //     sock_addr = new struct sockaddr_in;
-    // }
+    unsigned long long getIOUringUserdata(UringChannel * tc, uint8_t event_type){
+        assert((reinterpret_cast<uintptr_t>(tc) & 0xFFFF'0000'0000'0000) == 0);  //验证指针高位是否全是0
+        return reinterpret_cast<uint64_t>(tc) | ((uint64_t)event_type << 48);
+    }
 
-    // Channel::~Channel(){
-    //     //在这里的暂时先析构buf，否则会内存泄漏，后续有Channel对象池时就不用考虑这么问题了，而是归还buf
-    //     delete _buf;
-    //     delete sock_addr;
-    // }
+    void executeIOUringCallback(unsigned long long user_data, int res){
+        auto tc = reinterpret_cast<UringChannel *>(user_data & 0x0000'1111'1111'1111);
+        uint8_t event_type = static_cast<uint8_t>(user_data >> 48);
+        tc->do_io_uring(res, event_type);
+    }
 }
