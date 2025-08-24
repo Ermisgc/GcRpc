@@ -26,7 +26,7 @@ namespace GcRpc{
     //     }
 
     bool LoginService::Login(std::string name, std::string psw){
-        std::cout << name << ": " << psw << std::endl;
+        // std::cout << name << ": " << psw << std::endl;
         return true;
     }
 }

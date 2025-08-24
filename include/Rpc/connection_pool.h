@@ -31,11 +31,13 @@ namespace GcRpc{
         int _clientfd;  //对应的用户端fd
         int _target_bytes = PROTOCAL_HEADER_LEN; //为了解决粘包问题,要达到预定的target,它由头长度和服务长度交替修改
         
+        
         //数据头的解析进度，如果是0的话，说明应用层协议头还没有解析
         //如果是1的话，说明Rpc Header还没有解析
         //如果是2的话，说明头全部解析完了，现在需要去复制body
         uint8_t _header_process = 0;
         std::atomic<uint8_t> _connect_status{0};    //连接的状态，主要有是否可读，是否打算断连
+        std::atomic<int> _to_send_bytes{0};
         bool _active;
 
         RequestInformation _ri;  //临时性的_ri，每次执行异步操作时，会将它移动到工作线程
@@ -121,8 +123,10 @@ namespace GcRpc{
         
         int _upper_limit_count;  //连接总数的上限，在外面的连接+在空闲队列里的连接
         int _sockfd;
-        std::atomic<int> _outer_count;  //已经分配进行io_uring循环的连接数量
-        std::atomic<int> _accepting_count;  //当前正在执行accept的连接数量
+        std::atomic<int> _outer_count = 0;  //已经分配进行io_uring循环的连接数量
+        std::atomic<int> _accepting_count = 0;  //当前正在执行accept的连接数量
+        std::atomic<int> _allocated_count = 0;
+        std::atomic<int> _total_count = 0;   //总共处理完的连接数量
 
         EventLoop * _loop;
 
@@ -137,6 +141,8 @@ namespace GcRpc{
 
         //让当前进行accepting的连接数量保持在size
         void acceptForCount(int size);
+
+        int getActiveCoon();
 
     private:
 

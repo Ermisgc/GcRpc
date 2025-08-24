@@ -42,6 +42,7 @@ namespace GcRpc{
 
     public:
         RpcCaller();
+        ~RpcCaller();
         
         template <typename STUB>
         bool call(const std::string & method_name, const ::google::protobuf::Message * request, ::google::protobuf::Message * response){

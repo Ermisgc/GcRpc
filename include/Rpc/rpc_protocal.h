@@ -40,6 +40,14 @@ namespace GcRpc{
     };
 
     //TODO:响应也应该要设置一下这个类，因为响应也有
+    struct ResponseInformation{
+        uint64_t request_id;
+        uint8_t version;
+        uint8_t message_type;
+        uint8_t status;
+        uint8_t flag;
+        std::string body_data;
+    };
 
     //协议头的长度
     constexpr size_t PROTOCAL_HEADER_LEN = 20;

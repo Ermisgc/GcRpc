@@ -24,7 +24,8 @@ namespace GcRpc{
     using EventLoop = RpcProvider;
 
     struct ChannelV2{
-        std::unique_ptr<Buffer> buffer; //异步读的缓冲 //TODO:Buffer重新设计，可能需要读写双传冲区
+        std::unique_ptr<Buffer> read_buffer = std::make_unique<Buffer>(); //异步读的缓冲 //TODO:Buffer重新设计，可能需要读写双传冲区
+        std::unique_ptr<Buffer> write_buffer = std::make_unique<Buffer>(); //异步写的缓冲
         sockaddr_in sock_addr;
         socklen_t len {sizeof(sockaddr_in)};
     };

@@ -20,9 +20,10 @@ namespace GcRpc{
         std::vector<char> buf;
         uint16_t readIndex;
         uint16_t writeIndex;  
+        struct iovec * iov;
     public:
         Buffer(size_t max_size = MAX_BUFFER_SIZE);
-        ~Buffer() = default;
+        ~Buffer() noexcept;
         Buffer(const Buffer & other); //deepcopy
         Buffer(Buffer && other);
 

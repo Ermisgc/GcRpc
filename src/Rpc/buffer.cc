@@ -1,8 +1,14 @@
 #include "Rpc/buffer.h"
 #include <iostream>
+#include <assert.h>
 
 namespace GcRpc{
-    Buffer::Buffer(size_t max_size):readIndex(0), writeIndex(0), buf(max_size){
+    Buffer::Buffer(size_t max_size):readIndex(0), writeIndex(0), buf(max_size, 0), iov(new struct iovec[2]){
+
+    }
+
+    Buffer::~Buffer() noexcept{
+        delete iov;
     }
 
     Buffer::Buffer(const Buffer & other){ //deepcopy
@@ -62,11 +68,15 @@ namespace GcRpc{
         //1. writeIndex >= readIndex, only one area between readIndex and writeIndex - 1 can be read.
         //2. writeIndex < readIndex, two areas can be read: readIndex ~ MAX_BUFFER_SIZE - 1 and 0 ~ writeIndex.
         //corner condition should be concerned
-        struct iovec * iov = new struct iovec[2];
+        // struct iovec * iov = new struct iovec[2];
         iov[0].iov_base = begin() + readIndex;
         iov[0].iov_len = (writeIndex >= readIndex ? writeIndex: MAX_BUFFER_SIZE) - readIndex;
         iov[1].iov_base = begin();
         iov[1].iov_len = writeIndex >= readIndex ? 0 : writeIndex;
+        
+        assert(iov);
+        assert(iov[0].iov_len == 15);
+        assert(iov[1].iov_len == 0);
         return iov;
     }
 
@@ -76,11 +86,17 @@ namespace GcRpc{
         //   and left side of readIndex(0 ~ readIndex - 1) can be written in.
         //2. writeIndex < readIndex, one area between writeIndex and readIndex - 1 can be written in.
         //corner condition is writeIndex == readIndex.
-        struct iovec * iov = new struct iovec[2];
+        // struct iovec * iov = new struct iovec[2];
         iov[0].iov_base = begin() + writeIndex;
         iov[0].iov_len = (writeIndex >= readIndex? MAX_BUFFER_SIZE : (readIndex - 1)) - writeIndex;
         iov[1].iov_base = begin();
         iov[1].iov_len = writeIndex >= readIndex ? readIndex : 0;
+
+        assert(iov);
+        assert(iov[0].iov_base);
+        assert(iov[1].iov_base);
+        assert(iov[0].iov_len >= 0);
+        assert(iov[1].iov_len >= 0);
         return iov;
     }
 

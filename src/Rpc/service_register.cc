@@ -100,10 +100,27 @@ namespace GcRpc{
     }
 
     void ServiceRegister::callback_timeout(int res){
-        if(res == 0){
+        if(res == 0 || res == -ETIME){
             _loop->asyncHandle(std::bind(&ServiceRegister::updateNodeInfo, this));
         } else {
-            std::cerr << "timeout error" << std::endl;
+            switch (res)
+            {
+            case -EINVAL:
+                std::cerr << "One of the fields set in the SQE was invalid. \
+                For example, two clocksources were given, or the specified timeout seconds or nanoseconds were < 0." << endl;
+                break;
+            case -EFAULT:
+                std::cerr << "io_uring was unable to access the data specified by ts." << endl;
+                break;
+
+            case -ECANCELED:
+                std::cerr << "The timeout was canceled by a removal request." << endl;
+                break;
+            default:
+                std::cerr << "unknown error" << endl;
+                break;
+            }
+            
             stopRegister();
         }
     }

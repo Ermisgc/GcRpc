@@ -42,10 +42,12 @@ RpcProvider::RpcProvider(): ring(), params(), _service_register(this, stoi(GcRpc
     addr->sin_addr.s_addr = htonl(INADDR_ANY);
     addr->sin_family = AF_INET;
     addr->sin_port = htons(stoi(GcRpcApplication::Load("port")));
-    if(::bind(_fd, (sockaddr * )addr, sizeof(sockaddr_in)) < 0){
+    while(::bind(_fd, (sockaddr * )addr, sizeof(sockaddr_in)) < 0){
         std::cerr << "Failed to bind socket: " << strerror(errno) << std::endl;
-        throw std::runtime_error("Socket bind failed");
+        std::cout << "Retry to bind socket ..." << std::endl;
+        sleep(1);
     }
+
 
     //初始化线程池
     threadPond = gchipe::DynamicThreadPool::getInstance(stoi(GcRpcApplication::Load("worker_thread")));
@@ -97,15 +99,13 @@ void RpcProvider::loop(){
     //创建若干个io_uring接收缓冲区
     io_uring_cqe * cqes[params.cq_entries];
 
-
     //开始事件循环
     while(_status == PROVIDER_LOOPING){
         //设置accept
-        _connection_manager->acceptForCount(params.sq_entries);
-        
+        _connection_manager->acceptForCount(params.sq_entries / 4);
         //批量化提交io_uring
         io_uring_submit(&ring);
-
+        // p(ring.sq.sqe_tail);
         //获得返回值
         int finish_count = io_uring_peek_batch_cqe(&ring, cqes, params.cq_entries);
         for(int i = 0;i < finish_count; ++i){
@@ -132,6 +132,12 @@ void RpcProvider::onMessage(RequestInformation && ri){
 
     const ::google::protobuf::MethodDescriptor * desc = method_table.methodTable[ri.method_name];
     ::google::protobuf::Message* request_message = method_table.service->GetRequestPrototype(desc).New();
+    try{
+        request_message->ParseFromString(ri.body_data);
+    } catch(const std::exception & e){
+        std::cerr << ">>> Failed to parse request message: " << e.what() << std::endl;
+        return;
+    }
 
     ::google::protobuf::Message * response_message = method_table.service->GetResponsePrototype(desc).New();
     method_table.service->CallMethod(method_table.methodTable[ri.method_name], nullptr, request_message, response_message, nullptr);
@@ -139,15 +145,7 @@ void RpcProvider::onMessage(RequestInformation && ri){
     //然后现在要把这个response_message写出去：
     // ri.message_type = MESSAGE_TYPE_RESPONSE;
     std::string send_str = response_message->SerializeAsString();
-
-    if(ri.flag == 0){
-        ri.conn->send(std::move(send_str));
-    } else if(ri.flag == 1){  //发送完毕后关闭
-        ri.conn->sendThenClose(std::move(send_str));
-    } else {
-        std::cerr << "invalid flag" << std::endl;
-    }
-    
+    ri.conn->send(send_str);
 }
 
 void RpcProvider::sigint_handler(int sig){
@@ -159,7 +157,8 @@ void RpcProvider::sigint_handler(int sig){
 }
 
 struct io_uring_sqe * RpcProvider::getOneSqe(){
-    return io_uring_get_sqe(&ring);
+    auto sqe = io_uring_get_sqe(&ring);
+    return sqe;
 }
 
 void RpcProvider::asyncHandleRequest(RequestInformation && ri){
@@ -171,7 +170,7 @@ void RpcProvider::asyncHandleRequest(RequestInformation && ri){
 }
 
 std::string RpcProvider::getNodeInfo(){
-    _node_info_rpc.set_active_conn(_active_conn);
+    _node_info_rpc.set_active_conn(_connection_manager->getActiveCoon());
     return _node_info_rpc.SerializeAsString();
 }
 
